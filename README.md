@@ -6,7 +6,6 @@ Kontostände mitführen und am Ende sehen, wer wem was zahlt.
 Eine einzige HTML-Datei, kein Server, keine Bibliotheken, kein Konto. Läuft im Browser,
 lässt sich als App auf den Home-Bildschirm legen und funktioniert danach auch ohne Netz.
 
-![Icon](icon-192.png)
 
 ## Funktionen
 
