@@ -40,6 +40,7 @@
   .zahnrad{background:transparent;border:1px solid var(--linie);border-radius:8px;color:var(--leise);
            font-size:15px;line-height:1;width:34px;height:34px;cursor:pointer;flex:0 0 auto}
   .zahnrad:hover{color:var(--kreide);border-color:var(--messing)}
+  .zahnrad svg{display:block;margin:0 auto;pointer-events:none}
   #overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;overflow-y:auto}
   .blatt{max-width:560px;margin:0 auto;min-height:100%;background:var(--filz);
          padding:0 12px calc(40px + env(safe-area-inset-bottom))}
@@ -144,6 +145,15 @@
   .badge.pos{color:var(--plus);border-color:rgba(95,203,155,.4)}
   .badge.neg{color:var(--minus);border-color:rgba(217,96,90,.4)}
   .schalter{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 2px;border-bottom:1px solid var(--linie)}
+  .rintro{color:var(--leise);font-size:13px;line-height:1.6;margin:14px 0 0}
+  .rtext{color:var(--kreide);font-size:14px;line-height:1.62;margin:0 0 10px;opacity:.93}
+  .rliste{color:var(--kreide);font-size:14px;line-height:1.62;margin:0 0 10px;padding-left:20px;opacity:.93}
+  .rliste li{margin-bottom:5px}
+  .rzeile{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+          padding:9px 2px;border-bottom:1px solid var(--linie);font-size:14px}
+  .rzeile .rwert{font-family:var(--mono);font-size:12px;color:var(--messing);text-align:right}
+  .raus{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);
+        border:1px solid var(--linie);border-radius:4px;padding:2px 5px;margin-left:8px;white-space:nowrap}
   .wahl{display:flex;gap:5px}
   .wahl button{min-height:36px;padding:0 11px;border-radius:7px;border:1px solid var(--linie);background:transparent;
                color:var(--leise);font-size:12px;font-family:var(--mono);cursor:pointer}
@@ -158,6 +168,13 @@
   <div class="topbar">
     <div class="marke">Kladde</div>
     <div class="runde" id="rundeLbl">Runde 1</div>
+    <button class="zahnrad" id="regelwerkBtn" data-akt="regelwerkAuf" aria-label="Regelwerk">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+           stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 6.6C10.6 5.3 8.6 4.6 6 4.6H3.6v12.8H6c2.6 0 4.6.7 6 2 1.4-1.3 3.4-2 6-2h2.4V4.6H18c-2.6 0-4.6.7-6 2z"/>
+        <path d="M12 6.6v12.8"/>
+      </svg>
+    </button>
     <button class="zahnrad" id="settingsBtn" data-akt="settingsAuf" aria-label="Einstellungen">⚙</button>
   </div>
   <svg class="arc" viewBox="0 0 340 50" aria-hidden="true">
@@ -200,6 +217,7 @@
       <button class="knopf geist" data-akt="settingsZu" id="settingsZu">Fertig</button>
     </div>
     <div id="panel-regeln"></div>
+    <div id="panel-regelwerk" hidden></div>
   </div>
 </div>
 
@@ -213,7 +231,9 @@ const STD = {
   spieler:[], verlauf:[]
 };
 let S = JSON.parse(JSON.stringify(STD));
-let tab = 'spiel', resetArmiert = false, kasseOffen = null, settingsOffen = false;
+let tab = 'spiel', resetArmiert = false, kasseOffen = null;
+/* Das Overlay zeigt entweder die Einstellungen oder das Regelwerk: null | 'einstellungen' | 'regelwerk' */
+let blattOffen = null;
 
 /* ---------- Sprache ---------- */
 const TEXTE = {
@@ -239,6 +259,7 @@ const TEXTE = {
     gewinn:'Gewinn', push:'Push', verlust:'Verlust', blackjack:'Blackjack', aufgabe:'Aufgabe',
     split:'Split', handWeg:'Hand weg', versicherung:'Versicherung {0}', nichtGesetzt:'nicht gesetzt',
     wieHand1:'wie Hand 1',
+    regelwerk:'Regelwerk', regelwerkAria:'Regelwerk', amTischAus:'am Tisch aus',
     beiNull:'bei null',
     verlaufLeer:'Hier landet jede abgeschlossene Runde, jeder Einkauf und jede Korrektur. Solange nichts drinsteht, gibt es auch nichts zurückzunehmen.',
     einkauf:'Einkauf', korrektur:'Korrektur', weg:'Weg',
@@ -293,6 +314,7 @@ const TEXTE = {
     gewinn:'Win', push:'Push', verlust:'Loss', blackjack:'Blackjack', aufgabe:'Surrender',
     split:'Split', handWeg:'Remove hand', versicherung:'Insurance {0}', nichtGesetzt:'not placed',
     wieHand1:'same as hand 1',
+    regelwerk:'Rule book', regelwerkAria:'Rule book', amTischAus:'off at this table',
     beiNull:'at zero',
     verlaufLeer:'Every finished round, buy-in and adjustment lands here. While it is empty there is nothing to undo.',
     einkauf:'Buy-in', korrektur:'Adjustment', weg:'Gone',
@@ -326,6 +348,174 @@ const TEXTE = {
     fehler:'Error: ', unbekannt:'unknown', ladenFehler:'Loading: ', anzeigeFehler:'Display: '
   }
 };
+/* ---------- Regelwerk ----------
+   Nachschlagewerk hinter dem Buch-Knopf. Reiner Text, keine Logik.
+   Abschnitte mit id werden beim Rendern um den aktuellen Tischstand ergaenzt. */
+const REGELN = {
+  de: {
+    intro:'Was Blackjack ausmacht, in der Fassung, die diese Kladde mitrechnet. Weicht ihr am Tisch davon ab, gilt eure Absprache.',
+    bjAktuell:'Am Tisch eingestellt: {0}. Aus einem Einsatz von {1} wird ein Gewinn von {2}.',
+    abschnitte:[
+      {t:'Worum es geht', p:[
+        'Jeder spielt für sich gegen die Bank, nicht gegen die anderen am Tisch. Wer mit seinen Karten näher an 21 liegt als die Bank, gewinnt.',
+        'Wer über 21 kommt, hat überkauft und verliert sofort, auch wenn sich die Bank danach ebenfalls überkauft. Deshalb sitzt das Risiko immer beim Spieler, der zuerst zieht.'
+      ]},
+      {t:'Kartenwerte', ul:[
+        '2 bis 10 zählen so viel, wie draufsteht.',
+        'Bube, Dame und König zählen 10.',
+        'Das Ass zählt 11, oder 1, wenn die Hand sonst über 21 ginge.'
+      ], p2:[
+        'Eine Hand, in der ein Ass als 11 zählt, heißt weiche Hand. Ass und Sechs sind also weiche 17: eine weitere Karte kann nicht überkaufen, weil das Ass dann auf 1 fällt.'
+      ]},
+      {t:'Ablauf einer Runde', ol:[
+        'Alle setzen, bevor die erste Karte fällt.',
+        'Jeder Spieler bekommt zwei offene Karten, die Bank eine offene und eine verdeckte.',
+        'Reihum entscheidet jeder, ob er eine weitere Karte nimmt oder stehen bleibt.',
+        'Zum Schluss deckt die Bank auf und zieht nach fester Regel.',
+        'Jede Hand, die nicht überkauft ist, wird mit der Bank verglichen und abgerechnet.'
+      ]},
+      {t:'Ziehen, stehen, verdoppeln', ul:[
+        'Ziehen (Hit): eine weitere Karte, beliebig oft, bis 21 erreicht oder überschritten ist.',
+        'Stehen (Stand): keine weitere Karte, die Hand bleibt, wie sie ist.',
+        'Verdoppeln (Double down): der Einsatz wird verdoppelt, es kommt genau eine Karte, danach ist die Hand beendet. In der Kladde ist das der Knopf ×2.'
+      ]},
+      {t:'Split', p:[
+        'Sind die ersten beiden Karten gleichwertig, etwa zwei Achten, lassen sie sich auf zwei Hände aufteilen. Jede Hand bekommt eine neue zweite Karte und wird einzeln zu Ende gespielt.'
+      ], ul:[
+        'Jede zusätzliche Hand läuft mit demselben Einsatz wie die erste. In der Kladde lässt sich der Einsatz nach einem Split deshalb nur noch an Hand 1 ändern, und zwar für alle Hände zugleich.',
+        'Bis zu vier Hände sind möglich.',
+        'Ass und Zehn nach einem Split zählen als einfache 21, nicht als Blackjack.'
+      ]},
+      {id:'bj', t:'Blackjack', p:[
+        'Ass und eine Zehnerkarte auf den ersten beiden Karten. Das ist die beste Hand, sie schlägt jede andere 21 und wird sofort ausgezahlt, ohne dass die Bank weiterzieht.',
+        'Hat die Bank ebenfalls Blackjack, ist die Hand ein Push.'
+      ]},
+      {id:'vers', t:'Versicherung', p:[
+        'Zeigt die Bank ein Ass, kann jeder eine Nebenwette darauf abschließen, dass ihre verdeckte Karte eine Zehn ist. Der Einsatz beträgt die Hälfte des Grundeinsatzes und zahlt 2:1.'
+      ], ul:[
+        'Hat die Bank Blackjack, gleicht die Versicherung den Verlust der Hand genau aus, unterm Strich steht eine Null.',
+        'Hat sie keinen, ist der halbe Einsatz weg und die Hand läuft normal weiter.'
+      ], p2:[
+        'Auf Dauer kostet die Versicherung Geld, weil die Bank seltener Blackjack hat, als die Quote unterstellt. Wer nicht mitzählt, lässt sie besser liegen.'
+      ]},
+      {id:'aufgabe', t:'Aufgabe', p:[
+        'Nach den ersten beiden Karten kann eine Hand aufgegeben werden, bevor eine weitere Karte fällt. Die Hälfte des Einsatzes bleibt liegen, die andere Hälfte kommt zurück.',
+        'Das lohnt nur in klar aussichtslosen Lagen, etwa 16 gegen eine offene Zehn der Bank.'
+      ]},
+      {t:'Push', p:[
+        'Gleicher Zählwert wie die Bank. Der Einsatz kommt unverändert zurück, niemand zahlt.',
+        'Überkauft sich die Bank, ist das kein Push: dann gewinnen alle Hände, die noch stehen.'
+      ]},
+      {t:'Was die Bank tun muss', p:[
+        'Die Bank hat keine Wahl. Sie zieht, bis sie mindestens 17 erreicht, und bleibt dann stehen.',
+        'Ob sie bei einer weichen 17 noch einmal zieht, ist Hausregel und sollte vor der ersten Runde geklärt sein.'
+      ]}
+    ],
+    buchungTitel:'Wie die Kladde bucht',
+    buchung:[
+      ['Gewinn','+ Einsatz, verdoppelt + doppelter Einsatz'],
+      ['Blackjack','{BJ}'],
+      ['Push','0'],
+      ['Verlust','− Einsatz, verdoppelt − doppelter Einsatz'],
+      ['Aufgabe','− halber Einsatz'],
+      ['Versicherung','+ Einsatz bei Bank-Blackjack, sonst − halber Einsatz']
+    ],
+    buchungText:[
+      'Alle Beträge werden intern in Cent gerechnet, es entstehen also keine Rundungsfehler.',
+      'Die Bank bekommt die Gegenbuchung der Summe aller Spieler, damit die Kasse am Ende aufgeht.'
+    ],
+    hausTitel:'Vor der ersten Runde klären',
+    haus:[
+      'Zieht die Bank bei weicher 17 noch eine Karte?',
+      'Darf nach einem Split verdoppelt werden?',
+      'Dürfen geteilte Asse noch einmal geteilt werden?',
+      'Wie viele Hände sind erlaubt? Die Kladde lässt vier zu.'
+    ],
+    hausText:'Diese Fassungen unterscheiden sich von Tisch zu Tisch. Die Kladde rechnet nur mit, sie hält keine davon fest.'
+  },
+  en: {
+    intro:'What blackjack is, in the version this scorepad works with. If your table plays it differently, your agreement wins.',
+    bjAktuell:'Set at this table: {0}. A bet of {1} returns {2} in winnings.',
+    abschnitte:[
+      {t:'The point of the game', p:[
+        'Everyone plays against the bank on their own, not against the other players. Whoever ends up closer to 21 than the bank wins.',
+        'Going over 21 busts the hand and loses at once, even if the bank busts afterwards. That is why the risk always sits with the player who draws first.'
+      ]},
+      {t:'Card values', ul:[
+        '2 through 10 count their face value.',
+        'Jack, queen and king count 10.',
+        'An ace counts 11, or 1 if the hand would otherwise go over 21.'
+      ], p2:[
+        'A hand where an ace counts as 11 is called soft. Ace and six is soft 17: another card cannot bust it, because the ace then drops to 1.'
+      ]},
+      {t:'How a round runs', ol:[
+        'Everyone places their bet before the first card is dealt.',
+        'Each player gets two cards face up, the bank one face up and one face down.',
+        'In turn, everyone decides whether to take another card or stand.',
+        'Finally the bank reveals its card and draws by a fixed rule.',
+        'Every hand that has not busted is compared with the bank and settled.'
+      ]},
+      {t:'Hit, stand, double down', ul:[
+        'Hit: another card, as often as you like, until 21 is reached or passed.',
+        'Stand: no further card, the hand stays as it is.',
+        'Double down: the bet is doubled, exactly one card follows, then the hand is over. In this scorepad that is the ×2 button.'
+      ]},
+      {t:'Split', p:[
+        'If the first two cards are of equal value, two eights for instance, they can be split into two hands. Each hand gets a new second card and is played out on its own.'
+      ], ul:[
+        'Every extra hand runs on the same bet as the first. That is why the bet can only be changed on hand 1 after a split, and the change applies to all hands at once.',
+        'Up to four hands are possible.',
+        'Ace and ten after a split count as a plain 21, not as blackjack.'
+      ]},
+      {id:'bj', t:'Blackjack', p:[
+        'An ace and a ten-value card on the first two cards. It is the best hand, beats every other 21 and pays out immediately, without the bank drawing.',
+        'If the bank also has blackjack, the hand is a push.'
+      ]},
+      {id:'vers', t:'Insurance', p:[
+        'If the bank shows an ace, anyone can place a side bet that its face-down card is a ten. It costs half the main bet and pays 2:1.'
+      ], ul:[
+        'If the bank has blackjack, the insurance exactly offsets the lost hand and you come out even.',
+        'If it does not, half the bet is gone and the hand carries on as usual.'
+      ], p2:[
+        'Over time insurance costs money, because the bank holds blackjack less often than the odds imply. Unless you are counting, leave it alone.'
+      ]},
+      {id:'aufgabe', t:'Surrender', p:[
+        'After the first two cards a hand can be given up before any further card is dealt. Half the bet stays on the table, the other half comes back.',
+        'It only pays off in clearly hopeless spots, 16 against an exposed ten for example.'
+      ]},
+      {t:'Push', p:[
+        'The same total as the bank. The bet comes back untouched and nobody pays.',
+        'A busted bank is not a push: every hand still standing wins.'
+      ]},
+      {t:'What the bank has to do', p:[
+        'The bank has no choice. It draws until it reaches at least 17, then it stands.',
+        'Whether it draws again on a soft 17 is a house rule and should be settled before the first round.'
+      ]}
+    ],
+    buchungTitel:'How this scorepad books it',
+    buchung:[
+      ['Win','+ bet, doubled + twice the bet'],
+      ['Blackjack','{BJ}'],
+      ['Push','0'],
+      ['Loss','− bet, doubled − twice the bet'],
+      ['Surrender','− half the bet'],
+      ['Insurance','+ bet on a bank blackjack, else − half the bet']
+    ],
+    buchungText:[
+      'Everything is calculated internally in cents, so no rounding errors creep in.',
+      'The bank receives the counter entry for the sum of all players, so the books balance at the end.'
+    ],
+    hausTitel:'Settle before the first round',
+    haus:[
+      'Does the bank draw again on a soft 17?',
+      'Is doubling allowed after a split?',
+      'May split aces be split again?',
+      'How many hands are allowed? This scorepad permits four.'
+    ],
+    hausText:'These variants differ from table to table. The scorepad only keeps score, it does not enforce any of them.'
+  }
+};
+
 function t(k, ...a){
   const wb = TEXTE[S.sprache] || TEXTE.de;
   let s = wb[k] !== undefined ? wb[k] : (TEXTE.de[k] !== undefined ? TEXTE.de[k] : k);
@@ -412,7 +602,8 @@ function render(){
   el('rundeLbl').textContent = t('runde', S.runde);
   el('bogenText').textContent = bjText();
   el('settingsBtn').setAttribute('aria-label', t('einstellungenAria'));
-  el('settingsTitel').textContent = t('einstellungen');
+  el('regelwerkBtn').setAttribute('aria-label', t('regelwerkAria'));
+  el('settingsTitel').textContent = blattOffen==='regelwerk' ? t('regelwerk') : t('einstellungen');
   el('settingsZu').textContent = t('fertig');
   el('neuName').placeholder = t('namePlatz');
   el('addBtn').textContent = t('aufnehmen');
@@ -425,8 +616,11 @@ function render(){
   if(tab==='spiel'){ renderDealerLeiste(); renderSpiel(); }
   if(tab==='verlauf') renderVerlauf();
   if(tab==='kasse') renderKasse();
-  el('overlay').hidden = !settingsOffen;
-  if(settingsOffen) renderRegeln();
+  el('overlay').hidden = !blattOffen;
+  el('panel-regeln').hidden = blattOffen!=='einstellungen';
+  el('panel-regelwerk').hidden = blattOffen!=='regelwerk';
+  if(blattOffen==='einstellungen') renderRegeln();
+  if(blattOffen==='regelwerk') renderRegelwerk();
   renderFooter();
 }
 
@@ -657,6 +851,43 @@ function ausgleich(){
   return out;
 }
 
+function renderRegelwerk(){
+  const R = REGELN[S.sprache] || REGELN.de;
+  const fmt = (str, ...a) => { a.forEach((v,i)=>{ str = str.split('{'+i+'}').join(v); }); return str; };
+  const quote = S.bjFaktor===1.5 ? '3:2' : S.bjFaktor===1.2 ? '6:5' : '2:1';
+  const faktor = S.sprache==='en' ? String(S.bjFaktor) : String(S.bjFaktor).replace('.',',');
+  const einsatzWort = S.sprache==='en' ? 'bet' : 'Einsatz';
+  const bjZeile = '+ ' + faktor + ' × ' + einsatzWort + ' (' + quote + ')';
+
+  const abschnitte = R.abschnitte.map(a=>{
+    const aus = (a.id==='vers' && !S.versAn) || (a.id==='aufgabe' && !S.aufgabeAn);
+    let inner = (a.p||[]).map(x=>`<p class="rtext">${x}</p>`).join('');
+    if(a.ul) inner += `<ul class="rliste">${a.ul.map(x=>`<li>${x}</li>`).join('')}</ul>`;
+    if(a.ol) inner += `<ol class="rliste">${a.ol.map(x=>`<li>${x}</li>`).join('')}</ol>`;
+    inner += (a.p2||[]).map(x=>`<p class="rtext">${x}</p>`).join('');
+    if(a.id==='bj') inner += `<p class="hinweis">${fmt(R.bjAktuell, quote, eur(S.standard), eurS(Math.round(S.standard*S.bjFaktor)))}</p>`;
+    return `<div class="abschnitt">${a.t}${aus?`<span class="raus">${t('amTischAus')}</span>`:''}</div>${inner}`;
+  }).join('');
+
+  const tabelle = R.buchung.map((r,i)=>{
+    const aus = (i===4 && !S.aufgabeAn) || (i===5 && !S.versAn);
+    const wert = r[1]==='{BJ}' ? bjZeile : r[1];
+    return `<div class="rzeile">
+      <span>${r[0]}${aus?`<span class="raus">${t('amTischAus')}</span>`:''}</span>
+      <span class="rwert">${wert}</span></div>`;
+  }).join('');
+
+  el('panel-regelwerk').innerHTML = `
+    <p class="rintro">${R.intro}</p>
+    ${abschnitte}
+    <div class="abschnitt">${R.buchungTitel}</div>
+    ${tabelle}
+    ${R.buchungText.map(x=>`<p class="hinweis" style="margin-top:10px">${x}</p>`).join('')}
+    <div class="abschnitt">${R.hausTitel}</div>
+    <ul class="rliste">${R.haus.map(x=>`<li>${x}</li>`).join('')}</ul>
+    <p class="hinweis">${R.hausText}</p>`;
+}
+
 function renderRegeln(){
   const w = (akt,val,txt,cur)=>`<button data-akt="${akt}" data-w="${val}" aria-pressed="${cur}">${txt}</button>`;
   el('panel-regeln').innerHTML = `
@@ -710,7 +941,7 @@ document.addEventListener('click', e=>{
   try{ klick(e); }catch(err){ zeigeFehler(err.message); }
 });
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape' && settingsOffen){ settingsOffen=false; resetArmiert=false; render(); }
+  if(e.key==='Escape' && blattOffen){ blattOffen=null; resetArmiert=false; render(); }
 });
 /* Ein Spieler hat nach dem Split mehrere Haende, alle mit demselben Einsatz. */
 function setzeEinsatz(p, cent){
@@ -718,7 +949,7 @@ function setzeEinsatz(p, cent){
 }
 
 function klick(e){
-  if(e.target.id==='overlay'){ settingsOffen=false; resetArmiert=false; render(); return; }
+  if(e.target.id==='overlay'){ blattOffen=null; resetArmiert=false; render(); return; }
   const reiter = e.target.closest('.tab');
   if(reiter){ tab = reiter.dataset.tab; resetArmiert=false; render(); return; }
   const b = e.target.closest('[data-akt]');
@@ -729,8 +960,9 @@ function klick(e){
 
   switch(a){
     case 'name': return;
-    case 'settingsAuf': settingsOffen = true; resetArmiert=false; break;
-    case 'settingsZu': settingsOffen = false; resetArmiert=false; break;
+    case 'settingsAuf': blattOffen = 'einstellungen'; resetArmiert=false; el('overlay').scrollTop = 0; break;
+    case 'regelwerkAuf': blattOffen = 'regelwerk'; resetArmiert=false; el('overlay').scrollTop = 0; break;
+    case 'settingsZu': blattOffen = null; resetArmiert=false; break;
     case 'plus':  setzeEinsatz(p, h.einsatz + S.schritt); break;
     case 'minus': setzeEinsatz(p, Math.max(S.schritt, h.einsatz - S.schritt)); break;
     case 'setzeEinsatz': setzeEinsatz(p, +b.dataset.w); break;

@@ -36,6 +36,13 @@ lässt sich als App auf den Home-Bildschirm legen und funktioniert danach auch o
 - Jede Runde, jeder Einkauf, jede Korrektur mit Uhrzeit
 - Letzter Eintrag lässt sich vollständig zurücknehmen, inklusive Dealerwechsel
 
+**Regelwerk** (Buch oben rechts)
+
+- Nachschlagewerk zu Kartenwerten, Ablauf, Split, Double down, Versicherung, Aufgabe und Push
+- Was die Bank tun muss und was ihr vor der ersten Runde klären solltet
+- Die Buchungstabelle zeigt die Quote, die gerade eingestellt ist
+- Abgeschaltete Zusatzregeln sind als solche gekennzeichnet
+
 **Einstellungen** (Zahnrad oben rechts)
 
 - Sprache der Oberfläche: Deutsch oder Englisch, inklusive Zahlen- und Datumsformat
@@ -109,6 +116,10 @@ hochzählen. Sonst behalten bereits installierte Geräte die alte Fassung aus de
 
 Alle Oberflächentexte liegen im Objekt `TEXTE` im Skriptteil von `index.html`, je ein Block
 für Deutsch und Englisch. Weitere Sprachen lassen sich dort als zusätzlicher Block ergänzen.
+
+Der Inhalt des Regelwerks steht getrennt davon im Objekt `REGELN`, ebenfalls je Sprache.
+Ein Abschnitt besteht aus Titel, Absätzen (`p`), Aufzählung (`ul` oder `ol`) und Nachsatz (`p2`).
+Wer eigene Hausregeln festhalten will, hängt dort einen weiteren Abschnitt an.
 
 Farben, Abstände und Schriften stecken in den CSS-Variablen ganz oben in `index.html`,
 sowohl für das dunkle als auch für das helle Thema. Die Chipfarben der Salden-Anzeige
