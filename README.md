@@ -14,7 +14,7 @@ lässt sich als App auf den Home-Bildschirm legen und funktioniert danach auch o
 
 - Einsatz pro Spieler in frei wählbaren Schritten, dazu Schnellwerte von 0,50 € bis 10 €
 - Ergebnisse: Gewinn, Push, Verlust, Blackjack, Aufgabe
-- Double down, Split bis zu vier Händen, Versicherung
+- Double down, Split bis zu vier Händen, alle mit demselben Einsatz, Versicherung
 - Ein Klick für den ganzen Tisch: Dealer überkauft, Dealer gewinnt, alles Push
 - Live-Vorschau, was die Runde für jeden bedeutet, bevor sie gebucht wird
 

@@ -238,6 +238,7 @@ const TEXTE = {
     hand:'Hand {0}', einsatz:'Einsatz', weniger:'weniger', mehr:'mehr', fuerAlle:'für alle',
     gewinn:'Gewinn', push:'Push', verlust:'Verlust', blackjack:'Blackjack', aufgabe:'Aufgabe',
     split:'Split', handWeg:'Hand weg', versicherung:'Versicherung {0}', nichtGesetzt:'nicht gesetzt',
+    wieHand1:'wie Hand 1',
     beiNull:'bei null',
     verlaufLeer:'Hier landet jede abgeschlossene Runde, jeder Einkauf und jede Korrektur. Solange nichts drinsteht, gibt es auch nichts zurückzunehmen.',
     einkauf:'Einkauf', korrektur:'Korrektur', weg:'Weg',
@@ -291,6 +292,7 @@ const TEXTE = {
     hand:'Hand {0}', einsatz:'Bet', weniger:'lower', mehr:'raise', fuerAlle:'all players',
     gewinn:'Win', push:'Push', verlust:'Loss', blackjack:'Blackjack', aufgabe:'Surrender',
     split:'Split', handWeg:'Remove hand', versicherung:'Insurance {0}', nichtGesetzt:'not placed',
+    wieHand1:'same as hand 1',
     beiNull:'at zero',
     verlaufLeer:'Every finished round, buy-in and adjustment lands here. While it is empty there is nothing to undo.',
     einkauf:'Buy-in', korrektur:'Adjustment', weg:'Gone',
@@ -487,20 +489,27 @@ function renderSpiel(){
 
 function handHtml(p,pi,h,hi){
   const quick = [50,100,200,500,1000];
+  /* Nach einem Split laeuft jede Hand mit demselben Einsatz.
+     Bedient wird er nur an Hand 1, die weiteren Haende zeigen ihn nur an. */
+  const gesplittet = p.haende.length > 1;
+  const einsatzBedienbar = !gesplittet || hi === 0;
   return `
     <div class="hand">
       <div class="handkopf">
-        <span class="lbl">${p.haende.length>1?t('hand', hi+1):t('einsatz')}</span>
-        <button class="step" data-akt="minus" data-p="${pi}" data-h="${hi}" aria-label="${t('weniger')}">−</button>
+        <span class="lbl">${gesplittet?t('hand', hi+1):t('einsatz')}</span>
+        ${einsatzBedienbar?`<button class="step" data-akt="minus" data-p="${pi}" data-h="${hi}" aria-label="${t('weniger')}">−</button>`:''}
         <span class="einsatz">${eur(h.einsatz)}</span>
-        <button class="step" data-akt="plus" data-p="${pi}" data-h="${hi}" aria-label="${t('mehr')}">+</button>
+        ${einsatzBedienbar
+          ? `<button class="step" data-akt="plus" data-p="${pi}" data-h="${hi}" aria-label="${t('mehr')}">+</button>`
+          : `<span class="lbl2">${t('wieHand1')}</span>`}
         <button class="mod" data-akt="double" data-p="${pi}" data-h="${hi}" aria-pressed="${!!h.double}">×2</button>
       </div>
+      ${einsatzBedienbar?`
       <div class="quick">
         ${quick.map(q=>`<button data-akt="setzeEinsatz" data-p="${pi}" data-h="${hi}" data-w="${q}"
           class="${h.einsatz===q?'aktiv':''}">${eur(q)}</button>`).join('')}
         <button data-akt="einsatzAlle" data-p="${pi}" data-h="${hi}">${t('fuerAlle')}</button>
-      </div>
+      </div>`:''}
       <div class="reihe">
         ${['gewinn','push','verlust'].map(e=>`
           <button class="erg ${e}" data-akt="erg" data-e="${e}" data-p="${pi}" data-h="${hi}"
@@ -703,6 +712,11 @@ document.addEventListener('click', e=>{
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape' && settingsOffen){ settingsOffen=false; resetArmiert=false; render(); }
 });
+/* Ein Spieler hat nach dem Split mehrere Haende, alle mit demselben Einsatz. */
+function setzeEinsatz(p, cent){
+  p.haende.forEach(x => x.einsatz = cent);
+}
+
 function klick(e){
   if(e.target.id==='overlay'){ settingsOffen=false; resetArmiert=false; render(); return; }
   const reiter = e.target.closest('.tab');
@@ -717,9 +731,9 @@ function klick(e){
     case 'name': return;
     case 'settingsAuf': settingsOffen = true; resetArmiert=false; break;
     case 'settingsZu': settingsOffen = false; resetArmiert=false; break;
-    case 'plus':  h.einsatz += S.schritt; break;
-    case 'minus': h.einsatz = Math.max(S.schritt, h.einsatz - S.schritt); break;
-    case 'setzeEinsatz': h.einsatz = +b.dataset.w; break;
+    case 'plus':  setzeEinsatz(p, h.einsatz + S.schritt); break;
+    case 'minus': setzeEinsatz(p, Math.max(S.schritt, h.einsatz - S.schritt)); break;
+    case 'setzeEinsatz': setzeEinsatz(p, +b.dataset.w); break;
     case 'einsatzAlle': S.spieler.filter(spielt).forEach(q=>q.haende.forEach(x=>x.einsatz=h.einsatz)); break;
     case 'double': h.double = !h.double; if(h.double && (h.ergebnis==='bj'||h.ergebnis==='aufgabe')) h.ergebnis=null; break;
     case 'erg': {
