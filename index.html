@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kladde">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0E2C25">
+<meta name="description" content="Kontostände für die Blackjack-Runde am Küchentisch führen: Einsätze, Ergebnisse, Kasse und Ausgleich.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="color-scheme" content="dark light">
+<title>Blackjack-Kladde</title>
+<style>
+  :root{
+    --filz:#0E2C25; --filz-hell:#16382F; --filz-tief:#0A2019;
+    --linie:#2A5347; --kreide:#F2EFE6; --leise:#9FB5AC; --messing:#C9A227;
+    --plus:#5FCB9B; --minus:#D9605A; --auf:#0E2C25;
+    --chip-bone:#E8E2D2; --chip-rot:#C2453D; --chip-blau:#3E6EA8; --chip-schwarz:#14181A;
+    --chipring:rgba(255,255,255,.55);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  html[data-thema="hell"]{
+    --filz:#E7E2D5; --filz-hell:#F6F2E8; --filz-tief:#DBD4C2;
+    --linie:#BFB7A2; --kreide:#17302A; --leise:#5A6A62; --messing:#8A6A0C;
+    --plus:#1C7A55; --minus:#AC332C; --auf:#FFFFFF;
+    --chip-bone:#CFC7B0; --chip-rot:#B33F38; --chip-blau:#33608F; --chip-schwarz:#20262A;
+    --chipring:rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{background:var(--filz) !important}
+  body{margin:0;background:var(--filz) !important;color:var(--kreide);font-family:var(--sans);
+       -webkit-font-smoothing:antialiased;min-height:100vh}
+  body::before{content:"";position:fixed;inset:0;background:var(--filz);z-index:-1;pointer-events:none}
+  button{touch-action:manipulation}
+  .app{max-width:560px;margin:0 auto;padding:env(safe-area-inset-top) 12px calc(150px + env(safe-area-inset-bottom))}
+  .topbar{padding:14px 2px 2px;display:flex;align-items:baseline;justify-content:space-between}
+  .marke{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--messing)}
+  .runde{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--leise);text-transform:uppercase}
+  .arc{display:block;width:100%;height:50px;margin:-2px 0 4px}
+  .arc text{fill:var(--kreide);font-family:var(--sans);font-size:12px;letter-spacing:2.4px;text-transform:uppercase;opacity:.85}
+  .arc path{fill:none;stroke:var(--messing);stroke-width:1;opacity:.45}
+
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--linie);margin-bottom:12px}
+  .tab{flex:1;background:none;border:0;border-bottom:2px solid transparent;color:var(--leise);
+       font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:12px 2px;min-height:44px;cursor:pointer}
+  .tab.is-on{color:var(--kreide);border-bottom-color:var(--messing)}
+
+  .leiste{background:var(--filz-tief);border:1px solid var(--linie);border-radius:10px;padding:10px;margin-bottom:12px}
+  .leiste .kopfzeile{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .leiste .titel{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--messing);margin-right:auto}
+  .dealername{font-size:14px;font-weight:600}
+  .schnell{display:flex;gap:6px;flex-wrap:wrap}
+  .schnell button{flex:1 1 auto;min-height:38px;border-radius:8px;border:1px solid var(--linie);
+                  background:transparent;color:var(--kreide);font-size:12px;padding:0 10px;cursor:pointer;white-space:nowrap}
+  .schnell button.warnung[aria-pressed="true"]{border-color:var(--messing);color:var(--messing)}
+
+  .karte{background:var(--filz-hell);border:1px solid var(--linie);border-radius:10px;padding:11px;margin-bottom:10px}
+  .karte.dealer{border-color:var(--messing)}
+  .karte.pausiert{opacity:.55}
+  .kopf{display:flex;align-items:center;gap:8px}
+  .name{flex:1;min-width:0;background:none;border:0;color:var(--kreide);font-size:17px;font-weight:600;padding:4px 0;font-family:var(--sans)}
+  .name:focus{outline:none;border-bottom:1px solid var(--messing)}
+  .saldo{font-family:var(--mono);font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pos{color:var(--plus)} .neg{color:var(--minus)} .neutral{color:var(--leise)}
+  .marker{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--messing);
+          border:1px solid var(--messing);border-radius:4px;padding:2px 5px}
+  .stapel{display:flex;align-items:center;height:16px;margin:6px 0 8px}
+  .chip{width:15px;height:15px;border-radius:50%;margin-right:-4px;flex:0 0 auto;
+        border:2px dotted var(--chipring);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+  .stapel .leer{font-family:var(--mono);font-size:11px;color:var(--leise);letter-spacing:.08em}
+
+  .hand{border-top:1px dashed var(--linie);padding-top:9px;margin-top:4px}
+  .handkopf{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+  .lbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--leise);margin-right:auto}
+  .step{width:34px;height:34px;border-radius:8px;background:transparent;border:1px solid var(--linie);
+        color:var(--kreide);font-size:18px;line-height:1;cursor:pointer;flex:0 0 auto}
+  .einsatz{font-family:var(--mono);font-size:15px;min-width:62px;text-align:center;font-variant-numeric:tabular-nums}
+  .quick{display:flex;gap:5px;margin-bottom:7px;overflow-x:auto;padding-bottom:2px}
+  .quick button{flex:0 0 auto;min-height:30px;padding:0 9px;border-radius:6px;border:1px solid var(--linie);
+                background:transparent;color:var(--leise);font-family:var(--mono);font-size:11px;cursor:pointer}
+  .quick button.aktiv{border-color:var(--messing);color:var(--messing)}
+  .reihe{display:flex;gap:5px;margin-bottom:5px}
+  .erg{flex:1;min-height:42px;border-radius:8px;border:1px solid var(--linie);background:transparent;
+       color:var(--kreide);font-size:12px;cursor:pointer;padding:4px 2px;font-family:var(--sans)}
+  .erg small{display:block;font-family:var(--mono);font-size:10px;color:var(--leise);margin-top:2px}
+  .erg[aria-pressed="true"]{border-color:transparent;color:var(--auf);font-weight:700}
+  .erg[aria-pressed="true"] small{color:var(--auf);opacity:.75}
+  .erg.gewinn[aria-pressed="true"],.erg.bj[aria-pressed="true"]{background:var(--plus)}
+  .erg.verlust[aria-pressed="true"],.erg.aufgabe[aria-pressed="true"]{background:var(--minus)}
+  .erg.push[aria-pressed="true"]{background:var(--leise)}
+  .mod{min-height:34px;padding:0 9px;border-radius:8px;border:1px solid var(--linie);background:transparent;
+       color:var(--leise);font-size:12px;cursor:pointer;flex:0 0 auto}
+  .mod[aria-pressed="true"]{border-color:var(--messing);color:var(--messing)}
+  .fuss{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .vorschau{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;color:var(--leise);margin-right:auto}
+  .klein{background:none;border:1px solid transparent;border-radius:6px;color:var(--leise);font-size:11px;
+         letter-spacing:.06em;cursor:pointer;padding:6px 8px;min-height:34px;min-width:34px}
+  .klein:hover{color:var(--kreide);border-color:var(--linie)}
+  .klein[disabled]{opacity:.3;cursor:default}
+  .klein.gefahr:hover{color:var(--minus);border-color:var(--minus)}
+
+  .addrow{display:flex;gap:8px;margin-top:6px}
+  .feld{flex:1;background:var(--filz-hell);border:1px solid var(--linie);border-radius:8px;color:var(--kreide);
+        padding:12px;font-size:15px;font-family:var(--sans);min-height:46px;min-width:0}
+  .feld::placeholder{color:var(--leise)}
+  .knopf{background:var(--messing);color:var(--auf);border:0;border-radius:8px;padding:0 16px;font-size:13px;
+         font-weight:700;cursor:pointer;min-height:46px}
+  .knopf.geist{background:transparent;color:var(--kreide);border:1px solid var(--linie);font-weight:500}
+  .knopf.warn{background:transparent;color:var(--minus);border:1px solid var(--minus)}
+
+  .footer{position:fixed;left:0;right:0;bottom:0;background:var(--filz);border-top:1px solid var(--linie)}
+  .footer .inner{max-width:560px;margin:0 auto;padding:9px 12px calc(13px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center}
+  .bankbox{flex:0 0 auto;line-height:1.25}
+  .lbl2{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--leise)}
+  .wert{font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums}
+  .abschluss{flex:1;min-height:52px;background:var(--messing);color:var(--auf);border:0;border-radius:10px;
+             font-size:14px;font-weight:700;cursor:pointer}
+  .abschluss:disabled{background:var(--linie);color:var(--leise);cursor:default}
+  .abschluss small{display:block;font-weight:500;font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.75}
+
+  #fehlerband{background:var(--minus);color:#fff;padding:10px 12px;font-family:var(--mono);font-size:12px;line-height:1.4}
+  .zeile{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--linie)}
+  .zeile .wer{flex:1;font-size:15px;min-width:0}
+  .zeile .zahl{font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums}
+  .zeile .unter{display:block;font-size:11px;color:var(--leise);font-family:var(--mono)}
+  .abschnitt{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--messing);margin:22px 0 6px}
+  .hinweis{color:var(--leise);font-size:13px;line-height:1.55}
+  .block{border-bottom:1px solid var(--linie);padding:11px 2px}
+  .block .titel2{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--leise);
+                 margin-bottom:5px;display:flex;justify-content:space-between}
+  .badge{display:inline-block;font-family:var(--mono);font-size:12px;padding:2px 7px;border-radius:5px;
+         border:1px solid var(--linie);margin:0 5px 5px 0;font-variant-numeric:tabular-nums}
+  .badge.pos{color:var(--plus);border-color:rgba(95,203,155,.4)}
+  .badge.neg{color:var(--minus);border-color:rgba(217,96,90,.4)}
+  .schalter{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 2px;border-bottom:1px solid var(--linie)}
+  .wahl{display:flex;gap:5px}
+  .wahl button{min-height:36px;padding:0 11px;border-radius:7px;border:1px solid var(--linie);background:transparent;
+               color:var(--leise);font-size:12px;font-family:var(--mono);cursor:pointer}
+  .wahl button[aria-pressed="true"]{border-color:var(--messing);color:var(--messing)}
+  .kassefeld{padding:10px 2px 14px;border-bottom:1px solid var(--linie)}
+  textarea.feld{font-family:var(--mono);font-size:12px;min-height:150px;width:100%;line-height:1.5}
+  button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--messing);outline-offset:2px}
+</style>
+
+<div id="fehlerband" hidden></div>
+<div class="app">
+  <div class="topbar">
+    <div class="marke">Kladde</div>
+    <div class="runde">Runde <span id="rundeNr">1</span></div>
+  </div>
+  <svg class="arc" viewBox="0 0 340 50" aria-hidden="true">
+    <path id="bogen" d="M14,46 A170,170 0 0,1 326,46"></path>
+    <text><textPath href="#bogen" startOffset="50%" text-anchor="middle" id="bogenText">Blackjack zahlt 3 zu 2</textPath></text>
+  </svg>
+
+  <div class="tabs" role="tablist">
+    <button class="tab is-on" data-tab="spiel">Spiel</button>
+    <button class="tab" data-tab="verlauf">Verlauf</button>
+    <button class="tab" data-tab="kasse">Kasse</button>
+    <button class="tab" data-tab="regeln">Regeln</button>
+  </div>
+
+  <div id="panel-spiel">
+    <div id="dealerLeiste"></div>
+    <div id="liste"></div>
+    <div class="addrow">
+      <input id="neuName" class="feld" placeholder="Name eintragen" autocomplete="off">
+      <button id="addBtn" class="knopf">Aufnehmen</button>
+    </div>
+  </div>
+  <div id="panel-verlauf" hidden></div>
+  <div id="panel-kasse" hidden></div>
+  <div id="panel-regeln" hidden></div>
+</div>
+
+<div class="footer">
+  <div class="inner">
+    <div class="bankbox">
+      <div class="lbl2" id="bankLbl">Bank</div>
+      <div class="wert" id="bankWert">0,00 €</div>
+    </div>
+    <button class="abschluss" id="abschluss">Runde abschließen<small id="gewertet">nichts gewertet</small></button>
+  </div>
+</div>
+
+<script>
+const KEY = 'blackjack:kladde:v2';
+
+const STD = {
+  runde:1, standard:50, schritt:50, bjFaktor:1.5,
+  aufgabeAn:true, versAn:true, bankModus:'haus', dealerId:null,
+  bank:0, einsaetzeBehalten:true, dealerBJ:false, thema:'dunkel',
+  spieler:[], verlauf:[]
+};
+let S = JSON.parse(JSON.stringify(STD));
+let tab = 'spiel', resetArmiert = false, kasseOffen = null;
+
+/* ---------- Rechnen ---------- */
+const eur  = c => (c/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+const eurS = c => (c>0?'+':c<0?'−':'') + eur(Math.abs(c));
+const vz   = c => c>0?'pos':c<0?'neg':'neutral';
+
+function handDelta(h){
+  const e = h.einsatz, f = h.double ? 2*e : e;
+  switch(h.ergebnis){
+    case 'gewinn':  return f;
+    case 'verlust': return -f;
+    case 'push':    return 0;
+    case 'bj':      return Math.round(e*S.bjFaktor);
+    case 'aufgabe': return -Math.round(e/2);
+    default:        return 0;
+  }
+}
+function versDelta(p){
+  const h = p.haende[0];
+  if(!S.versAn || !h || !h.vers) return 0;
+  return S.dealerBJ ? h.einsatz : -Math.round(h.einsatz/2);
+}
+const spielerDelta = p => p.haende.reduce((s,h)=>s+handDelta(h),0) + versDelta(p);
+const istDealer = p => S.bankModus==='spieler' && p.id===S.dealerId;
+const spielt = p => !p.pausiert && !istDealer(p);
+const gewertet = p => spielt(p) && (p.haende.some(h=>h.ergebnis) || (S.versAn && p.haende[0].vers));
+
+/* ---------- Speicher ---------- */
+const lager = (()=>{ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return localStorage; }
+                    catch(e){ return null; } })();
+const speicherModus = window.storage ? 'claude' : (lager ? 'browser' : 'aus');
+const speicherText = {claude:'in Claude gesichert', browser:'in diesem Browser gesichert',
+                      aus:'kein Speicher verfügbar, Stände gelten nur bis zum Schließen'}[speicherModus];
+
+async function speichern(){
+  const text = JSON.stringify(S);
+  try{
+    if(window.storage) await window.storage.set(KEY, text);
+    else if(lager) lager.setItem(KEY, text);
+  }catch(e){ console.warn('Speichern nicht möglich', e); }
+}
+async function laden(){
+  try{
+    let roh = null;
+    if(window.storage){ const r = await window.storage.get(KEY); roh = r && r.value; }
+    if(!roh && lager) roh = lager.getItem(KEY);
+    if(roh){
+      const g = JSON.parse(roh);
+      S = Object.assign(JSON.parse(JSON.stringify(STD)), g);
+      S.spieler.forEach(p=>{
+        p.einkauf = p.einkauf||0; p.pausiert = !!p.pausiert;
+        p.haende = (p.haende&&p.haende.length?p.haende:[{einsatz:S.standard}]).map(h=>({
+          einsatz:h.einsatz||S.standard, double:!!h.double, ergebnis:h.ergebnis||null, vers:!!h.vers
+        }));
+      });
+    }
+  }catch(e){}
+}
+
+/* ---------- Chips ---------- */
+const WERTE = [[1000,'var(--chip-schwarz)'],[500,'var(--chip-blau)'],[100,'var(--chip-rot)'],[50,'var(--chip-bone)'],[25,'var(--chip-bone)']];
+function stapel(cents){
+  let rest = Math.abs(cents), out = [];
+  for(const [w,f] of WERTE){ while(rest>=w && out.length<14){ out.push(f); rest-=w; } }
+  if(!out.length) return '<span class="leer">bei null</span>';
+  return out.map(f=>`<span class="chip" style="background:${f}"></span>`).join('');
+}
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const el = id => document.getElementById(id);
+const bjText = () => S.bjFaktor===1.5?'Blackjack zahlt 3 zu 2':S.bjFaktor===1.2?'Blackjack zahlt 6 zu 5':'Blackjack zahlt 2 zu 1';
+
+/* ---------- Rendern ---------- */
+function render(){
+  document.documentElement.setAttribute('data-thema', S.thema==='hell'?'hell':'dunkel');
+  el('rundeNr').textContent = S.runde;
+  el('bogenText').textContent = bjText();
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('is-on', t.dataset.tab===tab));
+  ['spiel','verlauf','kasse','regeln'].forEach(t=>el('panel-'+t).hidden = tab!==t);
+  if(tab==='spiel'){ renderDealerLeiste(); renderSpiel(); }
+  if(tab==='verlauf') renderVerlauf();
+  if(tab==='kasse') renderKasse();
+  if(tab==='regeln') renderRegeln();
+  renderFooter();
+}
+
+function renderDealerLeiste(){
+  if(!S.spieler.length){ el('dealerLeiste').innerHTML=''; return; }
+  const d = S.spieler.find(istDealer);
+  el('dealerLeiste').innerHTML = `
+    <div class="leiste">
+      <div class="kopfzeile">
+        <span class="titel">Tisch</span>
+        ${S.bankModus==='spieler'
+          ? `<span class="dealername">Dealer: ${d?esc(d.name):'noch keiner'}</span>
+             <button class="mod" data-akt="dealerWeiter">weitergeben</button>`
+          : `<span class="dealername">${S.bankModus==='haus'?'Bank hält das Haus':'ohne Bankkonto'}</span>`}
+      </div>
+      <div class="schnell">
+        <button data-akt="alle" data-e="gewinn">Dealer überkauft</button>
+        <button data-akt="alle" data-e="verlust">Dealer gewinnt</button>
+        <button data-akt="alle" data-e="push">Alles Push</button>
+        <button data-akt="alleLeeren">Leeren</button>
+        ${S.versAn?`<button class="warnung" data-akt="dealerBJ" aria-pressed="${S.dealerBJ}">Dealer hat Blackjack</button>`:''}
+      </div>
+    </div>`;
+}
+
+function renderSpiel(){
+  const box = el('liste');
+  if(!S.spieler.length){
+    box.innerHTML = `<p class="hinweis">Noch niemand am Tisch. Namen eintragen, Einsätze stellen,
+      nach jeder Runde abhaken. Die Reihenfolge kannst du später mit den Pfeilen auf jeder Karte ändern.</p>`;
+    return;
+  }
+  box.innerHTML = S.spieler.map((p,pi)=>{
+    const d = spielerDelta(p), dealer = istDealer(p);
+    const koerper = dealer
+      ? `<p class="hinweis" style="margin:6px 0 0">Gibt diese Runde die Karten und bekommt die Gegenbuchung
+         aller Gewinne und Verluste.</p>`
+      : p.pausiert
+      ? `<p class="hinweis" style="margin:6px 0 0">Setzt diese Runde aus.</p>`
+      : p.haende.map((h,hi)=>handHtml(p,pi,h,hi)).join('');
+    return `
+      <article class="karte ${dealer?'dealer':''} ${p.pausiert?'pausiert':''}">
+        <div class="kopf">
+          <input class="name" value="${esc(p.name)}" data-akt="name" data-p="${pi}" aria-label="Name">
+          ${dealer?'<span class="marker">Dealer</span>':''}
+          ${p.pausiert?'<span class="marker">Pause</span>':''}
+          <div class="saldo ${vz(p.saldo)}">${eurS(p.saldo)}</div>
+        </div>
+        <div class="stapel">${stapel(p.saldo)}</div>
+        ${koerper}
+        <div class="fuss">
+          <span class="vorschau ${vz(d)}">${gewertet(p)?'Diese Runde '+eurS(d):dealer||p.pausiert?'':'Noch offen'}</span>
+          <button class="klein" data-akt="hoch" data-p="${pi}" ${pi===0?'disabled':''} aria-label="nach oben">↑</button>
+          <button class="klein" data-akt="runter" data-p="${pi}" ${pi===S.spieler.length-1?'disabled':''} aria-label="nach unten">↓</button>
+          ${S.bankModus==='spieler'?`<button class="klein" data-akt="setzeDealer" data-p="${pi}">Dealer</button>`:''}
+          <button class="klein" data-akt="pause" data-p="${pi}">${p.pausiert?'Zurück':'Pause'}</button>
+          <button class="klein gefahr" data-akt="entfernen" data-p="${pi}">Vom Tisch</button>
+        </div>
+      </article>`;
+  }).join('');
+}
+
+function handHtml(p,pi,h,hi){
+  const quick = [50,100,200,500,1000];
+  return `
+    <div class="hand">
+      <div class="handkopf">
+        <span class="lbl">${p.haende.length>1?'Hand '+(hi+1):'Einsatz'}</span>
+        <button class="step" data-akt="minus" data-p="${pi}" data-h="${hi}" aria-label="weniger">−</button>
+        <span class="einsatz">${eur(h.einsatz)}</span>
+        <button class="step" data-akt="plus" data-p="${pi}" data-h="${hi}" aria-label="mehr">+</button>
+        <button class="mod" data-akt="double" data-p="${pi}" data-h="${hi}" aria-pressed="${!!h.double}">×2</button>
+      </div>
+      <div class="quick">
+        ${quick.map(q=>`<button data-akt="setzeEinsatz" data-p="${pi}" data-h="${hi}" data-w="${q}"
+          class="${h.einsatz===q?'aktiv':''}">${eur(q)}</button>`).join('')}
+        <button data-akt="einsatzAlle" data-p="${pi}" data-h="${hi}">für alle</button>
+      </div>
+      <div class="reihe">
+        ${[['gewinn','Gewinn'],['push','Push'],['verlust','Verlust']].map(([e,t])=>`
+          <button class="erg ${e}" data-akt="erg" data-e="${e}" data-p="${pi}" data-h="${hi}"
+            aria-pressed="${h.ergebnis===e}">${t}</button>`).join('')}
+      </div>
+      <div class="reihe">
+        <button class="erg bj" data-akt="erg" data-e="bj" data-p="${pi}" data-h="${hi}" aria-pressed="${h.ergebnis==='bj'}">
+          Blackjack<small>${eurS(Math.round(h.einsatz*S.bjFaktor))}</small></button>
+        ${S.aufgabeAn?`<button class="erg aufgabe" data-akt="erg" data-e="aufgabe" data-p="${pi}" data-h="${hi}" aria-pressed="${h.ergebnis==='aufgabe'}">
+          Aufgabe<small>${eurS(-Math.round(h.einsatz/2))}</small></button>`:''}
+        ${hi===0
+          ? `<button class="erg" data-akt="split" data-p="${pi}" ${p.haende.length>=4?'disabled':''}>Split</button>`
+          : `<button class="erg" data-akt="unsplit" data-p="${pi}" data-h="${hi}">Hand weg</button>`}
+      </div>
+      ${(S.versAn && hi===0)?`
+      <div class="reihe">
+        <button class="erg" data-akt="vers" data-p="${pi}" aria-pressed="${!!h.vers}"
+          style="${h.vers?'border-color:var(--messing);color:var(--messing)':''}">
+          Versicherung ${eur(Math.round(h.einsatz/2))}
+          <small>${h.vers?(S.dealerBJ?eurS(h.einsatz):eurS(-Math.round(h.einsatz/2))):'nicht gesetzt'}</small></button>
+      </div>`:''}
+    </div>`;
+}
+
+function renderFooter(){
+  const n = S.spieler.filter(gewertet).length, aktive = S.spieler.filter(spielt).length;
+  el('abschluss').disabled = n===0;
+  el('gewertet').textContent = n===0 ? 'nichts gewertet' : `${n} von ${aktive} gewertet`;
+  const d = S.spieler.find(istDealer);
+  el('bankLbl').textContent = S.bankModus==='spieler' ? (d?esc(d.name):'Dealer') : S.bankModus==='haus' ? 'Bank' : 'Tisch';
+  const w = S.bankModus==='spieler' ? (d?d.saldo:0) : S.bankModus==='haus' ? S.bank : S.spieler.reduce((s,p)=>s+p.saldo,0);
+  el('bankWert').textContent = eurS(w);
+  el('bankWert').className = 'wert ' + vz(w);
+}
+
+function renderVerlauf(){
+  const p = el('panel-verlauf');
+  if(!S.verlauf.length){
+    p.innerHTML = `<p class="hinweis">Hier landet jede abgeschlossene Runde, jeder Einkauf und jede Korrektur.
+      Solange nichts drinsteht, gibt es auch nichts zurückzunehmen.</p>`;
+    return;
+  }
+  const rows = [...S.verlauf].reverse().map(r=>{
+    if(r.typ!=='runde'){
+      return `<div class="block"><div class="titel2"><span>${r.typ==='einkauf'?'Einkauf':'Korrektur'}</span><span>${r.zeit||''}</span></div>
+        <span class="hinweis">${esc(r.text||'')}</span></div>`;
+    }
+    return `<div class="block">
+      <div class="titel2"><span>Runde ${r.runde}</span><span>${r.zeit||''}</span></div>
+      ${Object.entries(r.deltas).map(([id,c])=>{
+        const q = S.spieler.find(x=>x.id===id);
+        return `<span class="badge ${vz(c)}">${esc(q?q.name:'Weg')} ${eurS(c)}</span>`;
+      }).join('')}
+      ${r.bank?`<span class="badge ${vz(r.bank)}">Bank ${eurS(r.bank)}</span>`:''}
+    </div>`;
+  }).join('');
+  p.innerHTML = `<button class="knopf geist" style="width:100%" data-akt="undo">Letzten Eintrag zurücknehmen</button>
+    <div class="abschnitt">${S.verlauf.length} Einträge</div>${rows}`;
+}
+
+function statistik(){
+  const st = {};
+  S.spieler.forEach(p=>st[p.id]={h:0,g:0,v:0,pu:0,bj:0});
+  S.verlauf.filter(r=>r.typ==='runde').forEach(r=>{
+    Object.entries(r.ergebnisse||{}).forEach(([id,liste])=>{
+      if(!st[id]) return;
+      liste.forEach(e=>{
+        st[id].h++;
+        if(e==='gewinn') st[id].g++;
+        else if(e==='bj'){ st[id].g++; st[id].bj++; }
+        else if(e==='verlust'||e==='aufgabe') st[id].v++;
+        else if(e==='push') st[id].pu++;
+      });
+    });
+  });
+  return st;
+}
+
+function renderKasse(){
+  const st = statistik();
+  const sortiert = [...S.spieler].sort((a,b)=>b.saldo-a.saldo);
+  const stand = sortiert.map(x=>{
+    const s = st[x.id]||{h:0,g:0,v:0,pu:0,bj:0};
+    const auf = kasseOffen===x.id;
+    return `<div class="zeile" data-akt="kasseAuf" data-id="${x.id}" style="cursor:pointer">
+        <span class="wer">${esc(x.name)}
+          <span class="unter">${s.h} Hände · ${s.g} gewonnen · ${s.v} verloren · ${s.pu} Push · ${s.bj} BJ</span>
+          <span class="unter">Einkauf ${eur(x.einkauf)} · Auszahlung ${eur(x.einkauf+x.saldo)}</span>
+        </span>
+        <span class="zahl ${vz(x.saldo)}">${eurS(x.saldo)}</span>
+      </div>
+      ${auf?kassePanel(x):''}`;
+  }).join('');
+  const bankZeile = S.bankModus==='haus'
+    ? `<div class="zeile"><span class="wer" style="color:var(--messing)">Bank (Haus)</span>
+       <span class="zahl ${vz(S.bank)}">${eurS(S.bank)}</span></div>` : '';
+  const t = ausgleich();
+  const trans = t.length
+    ? t.map(x=>`<div class="zeile"><span class="wer">${esc(x.von)} zahlt an ${esc(x.an)}</span>
+        <span class="zahl">${eur(x.betrag)}</span></div>`).join('')
+    : `<p class="hinweis">Alles ausgeglichen, niemand schuldet etwas.</p>`;
+  el('panel-kasse').innerHTML = `
+    <div class="abschnitt">Kontostände (tippen für Einkauf und Korrektur)</div>${stand}${bankZeile}
+    <div class="abschnitt">Ausgleich am Ende</div>${trans}
+    <div class="abschnitt">Notizzettel</div>
+    <button class="knopf geist" style="width:100%" data-akt="export">Abrechnung als Text erzeugen</button>
+    <div id="exportBox"></div>`;
+}
+
+function kassePanel(x){
+  return `<div class="kassefeld">
+    <div class="lbl2" style="margin-bottom:6px">Einkauf buchen</div>
+    <div class="schnell" style="margin-bottom:10px">
+      ${[500,1000,2000,5000].map(c=>`<button data-akt="einkauf" data-id="${x.id}" data-w="${c}">+ ${eur(c)}</button>`).join('')}
+    </div>
+    <div class="lbl2" style="margin-bottom:6px">Saldo von Hand korrigieren</div>
+    <div class="addrow">
+      <input class="feld" id="korr-${x.id}" inputmode="decimal" placeholder="Betrag, z. B. 2,50">
+      <button class="knopf geist" data-akt="korr" data-id="${x.id}" data-r="plus">+</button>
+      <button class="knopf geist" data-akt="korr" data-id="${x.id}" data-r="minus">−</button>
+    </div>
+  </div>`;
+}
+
+function ausgleich(){
+  let konten = S.spieler.map(p=>({name:p.name, c:p.saldo}));
+  if(S.bankModus==='haus') konten.push({name:'Bank', c:S.bank});
+  const minus = konten.filter(k=>k.c<0).map(k=>({...k,c:-k.c})).sort((a,b)=>b.c-a.c);
+  const plus  = konten.filter(k=>k.c>0).sort((a,b)=>b.c-a.c);
+  const out=[]; let i=0,j=0;
+  while(i<minus.length && j<plus.length){
+    const m = Math.min(minus[i].c, plus[j].c);
+    if(m>0) out.push({von:minus[i].name, an:plus[j].name, betrag:m});
+    minus[i].c-=m; plus[j].c-=m;
+    if(minus[i].c===0) i++;
+    if(plus[j].c===0) j++;
+  }
+  return out;
+}
+
+function renderRegeln(){
+  const w = (akt,val,txt,cur)=>`<button data-akt="${akt}" data-w="${val}" aria-pressed="${cur}">${txt}</button>`;
+  el('panel-regeln').innerHTML = `
+    <div class="abschnitt">Auszahlung</div>
+    <div class="schalter"><span class="wer">Blackjack zahlt</span><span class="wahl">
+      ${w('bjF','1.5','3:2',S.bjFaktor===1.5)}${w('bjF','1.2','6:5',S.bjFaktor===1.2)}${w('bjF','2','2:1',S.bjFaktor===2)}
+    </span></div>
+    <div class="schalter"><span class="wer">Schrittweite Einsatz</span><span class="wahl">
+      ${w('schritt','25','0,25',S.schritt===25)}${w('schritt','50','0,50',S.schritt===50)}${w('schritt','100','1,00',S.schritt===100)}
+    </span></div>
+    <div class="schalter"><span class="wer">Standardeinsatz neuer Spieler</span><span class="wahl">
+      <button class="step" data-akt="stdMinus">−</button><span class="zahl" style="min-width:62px;text-align:center">${eur(S.standard)}</span>
+      <button class="step" data-akt="stdPlus">+</button>
+    </span></div>
+
+    <div class="abschnitt">Zusatzregeln</div>
+    <div class="schalter"><span class="wer">Aufgabe (Surrender)</span>
+      <button class="mod" data-akt="aufgabeAn" aria-pressed="${S.aufgabeAn}">${S.aufgabeAn?'an':'aus'}</button></div>
+    <div class="schalter"><span class="wer">Versicherung</span>
+      <button class="mod" data-akt="versAn" aria-pressed="${S.versAn}">${S.versAn?'an':'aus'}</button></div>
+    <div class="schalter"><span class="wer">Einsätze nach der Runde behalten</span>
+      <button class="mod" data-akt="behalten" aria-pressed="${S.einsaetzeBehalten}">${S.einsaetzeBehalten?'an':'aus'}</button></div>
+
+    <div class="abschnitt">Wer hält die Bank</div>
+    <div class="schalter"><span class="wer">Bankkonto</span><span class="wahl">
+      ${w('bankModus','haus','Haus',S.bankModus==='haus')}${w('bankModus','spieler','Spieler',S.bankModus==='spieler')}${w('bankModus','aus','keins',S.bankModus==='aus')}
+    </span></div>
+    <p class="hinweis">Haus: ein eigenes Bankkonto sammelt alle Gegenbuchungen. Spieler: der Dealer am Tisch
+      bekommt sie gutgeschrieben und kann nach jeder Runde weitergegeben werden. Keins: nur die Spielersalden zählen.</p>
+
+    <div class="abschnitt">Speicher</div>
+    <p class="hinweis">Stände werden ${speicherText}.</p>
+
+    <div class="abschnitt">Darstellung</div>
+    <div class="schalter"><span class="wer">Farben</span><span class="wahl">
+      ${w('thema','dunkel','Filzgrün',S.thema!=='hell')}${w('thema','hell','Hell',S.thema==='hell')}
+    </span></div>
+
+    <div class="abschnitt">Aufräumen</div>
+    <button class="knopf geist" style="width:100%;margin-bottom:8px" data-akt="saldenNull">Salden auf null, Spieler bleiben</button>
+    <button class="knopf warn" style="width:100%" data-akt="reset">
+      ${resetArmiert?'Wirklich alles löschen? Nochmal tippen':'Alles zurücksetzen'}</button>`;
+}
+
+/* ---------- Klicks ---------- */
+document.addEventListener('click', e=>{
+  try{ klick(e); }catch(err){ zeigeFehler(err.message); }
+});
+function klick(e){
+  const t = e.target.closest('.tab');
+  if(t){ tab = t.dataset.tab; resetArmiert=false; render(); return; }
+  const b = e.target.closest('[data-akt]');
+  if(!b) return;
+  const a = b.dataset.akt;
+  const p = b.dataset.p!==undefined ? S.spieler[b.dataset.p] : null;
+  const h = p && b.dataset.h!==undefined ? p.haende[b.dataset.h] : null;
+
+  switch(a){
+    case 'name': return;
+    case 'plus':  h.einsatz += S.schritt; break;
+    case 'minus': h.einsatz = Math.max(S.schritt, h.einsatz - S.schritt); break;
+    case 'setzeEinsatz': h.einsatz = +b.dataset.w; break;
+    case 'einsatzAlle': S.spieler.filter(spielt).forEach(q=>q.haende.forEach(x=>x.einsatz=h.einsatz)); break;
+    case 'double': h.double = !h.double; if(h.double && (h.ergebnis==='bj'||h.ergebnis==='aufgabe')) h.ergebnis=null; break;
+    case 'erg': {
+      const e2 = b.dataset.e;
+      h.ergebnis = h.ergebnis===e2 ? null : e2;
+      if(h.ergebnis==='bj'||h.ergebnis==='aufgabe') h.double = false;
+      break;
+    }
+    case 'vers': p.haende[0].vers = !p.haende[0].vers; break;
+    case 'split': if(p.haende.length<4) p.haende.push({einsatz:p.haende[0].einsatz,double:false,ergebnis:null,vers:false}); break;
+    case 'unsplit': p.haende.splice(b.dataset.h,1); break;
+    case 'hoch': tausche(+b.dataset.p, +b.dataset.p-1); break;
+    case 'runter': tausche(+b.dataset.p, +b.dataset.p+1); break;
+    case 'pause': p.pausiert = !p.pausiert; break;
+    case 'setzeDealer': S.dealerId = p.id; break;
+    case 'dealerWeiter': dealerWeiter(); break;
+    case 'entfernen': S.spieler.splice(b.dataset.p,1); break;
+    case 'alle': S.spieler.filter(spielt).forEach(q=>q.haende.forEach(x=>{
+        if(x.ergebnis!=='bj' && x.ergebnis!=='aufgabe') x.ergebnis = b.dataset.e; })); break;
+    case 'alleLeeren': S.spieler.forEach(q=>q.haende.forEach(x=>{x.ergebnis=null;x.double=false;x.vers=false;})); S.dealerBJ=false; break;
+    case 'dealerBJ': S.dealerBJ = !S.dealerBJ; break;
+    case 'undo': undo(); break;
+    case 'kasseAuf': kasseOffen = kasseOffen===b.dataset.id ? null : b.dataset.id; break;
+    case 'einkauf': {
+      const q = S.spieler.find(x=>x.id===b.dataset.id);
+      q.einkauf += +b.dataset.w;
+      protokoll('einkauf', `${q.name}: Einkauf ${eur(+b.dataset.w)}, insgesamt ${eur(q.einkauf)}`);
+      break;
+    }
+    case 'korr': {
+      const q = S.spieler.find(x=>x.id===b.dataset.id);
+      const feld = el('korr-'+q.id);
+      const c = Math.round(parseFloat(String(feld.value).replace(',','.'))*100);
+      if(!c || isNaN(c)) { feld.focus(); return; }
+      const d = b.dataset.r==='minus' ? -Math.abs(c) : Math.abs(c);
+      q.saldo += d;
+      protokoll('korrektur', `${q.name}: ${eurS(d)} von Hand gebucht`, {[q.id]:d});
+      break;
+    }
+    case 'export': zeigeExport(); return;
+    case 'bjF': S.bjFaktor = parseFloat(b.dataset.w); break;
+    case 'schritt': S.schritt = +b.dataset.w; S.standard = Math.max(S.schritt, Math.round(S.standard/S.schritt)*S.schritt); break;
+    case 'stdPlus': S.standard += S.schritt; break;
+    case 'stdMinus': S.standard = Math.max(S.schritt, S.standard - S.schritt); break;
+    case 'aufgabeAn': S.aufgabeAn = !S.aufgabeAn; break;
+    case 'versAn': S.versAn = !S.versAn; if(!S.versAn){ S.dealerBJ=false; S.spieler.forEach(q=>q.haende.forEach(x=>x.vers=false)); } break;
+    case 'behalten': S.einsaetzeBehalten = !S.einsaetzeBehalten; break;
+    case 'thema': S.thema = b.dataset.w; break;
+    case 'bankModus':
+      S.bankModus = b.dataset.w;
+      if(S.bankModus==='spieler' && !S.spieler.some(istDealer) && S.spieler.length) S.dealerId = S.spieler[0].id;
+      break;
+    case 'saldenNull': S.spieler.forEach(q=>{q.saldo=0;q.einkauf=0;}); S.bank=0; S.verlauf=[]; S.runde=1; break;
+    case 'reset':
+      if(!resetArmiert){ resetArmiert=true; render(); return; }
+      S = JSON.parse(JSON.stringify(STD)); resetArmiert=false; kasseOffen=null;
+      break;
+    default: return;
+  }
+  render(); speichern();
+}
+
+document.addEventListener('input', e=>{
+  const n = e.target.closest('[data-akt="name"]');
+  if(!n) return;
+  S.spieler[n.dataset.p].name = n.value;
+  speichern();
+});
+
+function tausche(i,j){
+  if(j<0||j>=S.spieler.length) return;
+  const t = S.spieler[i]; S.spieler[i]=S.spieler[j]; S.spieler[j]=t;
+}
+function dealerWeiter(){
+  if(!S.spieler.length) return;
+  const i = S.spieler.findIndex(istDealer);
+  S.dealerId = S.spieler[(i+1) % S.spieler.length].id;
+}
+function protokoll(typ, text, deltas){
+  S.verlauf.push({typ, text, deltas:deltas||{}, ergebnisse:{}, bank:0,
+    zeit:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});
+}
+
+el('addBtn').addEventListener('click', aufnehmen);
+el('neuName').addEventListener('keydown', e=>{ if(e.key==='Enter') aufnehmen(); });
+function aufnehmen(){
+  const f = el('neuName'), name = f.value.trim();
+  if(!name){ f.focus(); return; }
+  S.spieler.push({id:'s'+Date.now()+Math.random().toString(36).slice(2,5), name, saldo:0, einkauf:0,
+    pausiert:false, haende:[{einsatz:S.standard,double:false,ergebnis:null,vers:false}]});
+  if(S.bankModus==='spieler' && !S.dealerId) S.dealerId = S.spieler[0].id;
+  f.value=''; render(); speichern();
+}
+
+el('abschluss').addEventListener('click', ()=>{
+  const deltas={}, ergebnisse={}; let summe=0;
+  S.spieler.forEach(p=>{
+    if(!gewertet(p)) return;
+    const d = spielerDelta(p);
+    deltas[p.id]=d; summe+=d; p.saldo+=d;
+    ergebnisse[p.id] = p.haende.filter(h=>h.ergebnis).map(h=>h.ergebnis);
+  });
+  if(!Object.keys(deltas).length) return;
+  let bankDelta = 0;
+  if(S.bankModus==='haus'){ S.bank -= summe; bankDelta = -summe; }
+  else if(S.bankModus==='spieler'){
+    const d = S.spieler.find(istDealer);
+    if(d){ d.saldo -= summe; bankDelta = -summe; deltas[d.id] = (deltas[d.id]||0) - summe; }
+  }
+  S.verlauf.push({typ:'runde', runde:S.runde, deltas, ergebnisse,
+    bank:S.bankModus==='haus'?bankDelta:0,
+    zeit:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});
+  S.runde++;
+  S.dealerBJ=false;
+  S.spieler.forEach(p=>{
+    const e = S.einsaetzeBehalten ? p.haende[0].einsatz : S.standard;
+    p.haende = [{einsatz:e, double:false, ergebnis:null, vers:false}];
+  });
+  if(S.bankModus==='spieler') dealerWeiter();
+  render(); speichern();
+});
+
+function undo(){
+  const r = S.verlauf.pop();
+  if(!r) return;
+  Object.entries(r.deltas||{}).forEach(([id,c])=>{
+    const p = S.spieler.find(x=>x.id===id);
+    if(p) p.saldo -= c;
+  });
+  if(r.typ==='runde'){
+    S.bank -= r.bank||0;
+    S.runde = Math.max(1, S.runde-1);
+    if(S.bankModus==='spieler'){
+      const i = S.spieler.findIndex(istDealer);
+      if(i>=0) S.dealerId = S.spieler[(i-1+S.spieler.length)%S.spieler.length].id;
+    }
+  }
+  if(r.typ==='einkauf'){
+    const m = /^(.*?): Einkauf/.exec(r.text||'');
+    const p = m && S.spieler.find(x=>x.name===m[1]);
+    const c = /Einkauf ([\d.,]+)/.exec(r.text||'');
+    if(p && c) p.einkauf = Math.max(0, p.einkauf - Math.round(parseFloat(c[1].replace('.','').replace(',','.'))*100));
+  }
+}
+
+function zeigeExport(){
+  const runden = S.verlauf.filter(r=>r.typ==='runde').length;
+  const zeilen = [
+    `Blackjack-Abrechnung, ${new Date().toLocaleDateString('de-DE')}`,
+    `${runden} Runden, ${bjText()}`, '',
+    ...[...S.spieler].sort((a,b)=>b.saldo-a.saldo).map(p=>
+      `${p.name}: ${eurS(p.saldo)}  (Einkauf ${eur(p.einkauf)}, Auszahlung ${eur(p.einkauf+p.saldo)})`),
+    ...(S.bankModus==='haus'?[`Bank: ${eurS(S.bank)}`]:[]), '',
+    'Ausgleich:',
+    ...(ausgleich().map(t=>`${t.von} zahlt ${eur(t.betrag)} an ${t.an}`)),
+  ];
+  el('exportBox').innerHTML = `<textarea class="feld" readonly style="margin-top:8px">${esc(zeilen.join('\n'))}</textarea>`;
+  const ta = el('exportBox').querySelector('textarea');
+  ta.focus(); ta.select();
+  try{ navigator.clipboard && navigator.clipboard.writeText(zeilen.join('\n')); }catch(e){}
+}
+
+function zeigeFehler(txt){
+  const f = document.getElementById('fehlerband');
+  if(!f) return;
+  f.hidden = false;
+  f.textContent = 'Fehler: ' + txt;
+}
+window.addEventListener('error', ev=>zeigeFehler(ev.message||'unbekannt'));
+window.addEventListener('unhandledrejection', ev=>zeigeFehler(String(ev.reason)));
+
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+
+(async ()=>{
+  try{ await laden(); }catch(e){ zeigeFehler('Laden: '+e.message); }
+  try{ render(); }catch(e){ zeigeFehler('Anzeige: '+e.message); }
+})();
+</script>
