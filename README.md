@@ -6,6 +6,7 @@ Kontostände mitführen und am Ende sehen, wer wem was zahlt.
 Eine einzige HTML-Datei, kein Server, keine Bibliotheken, kein Konto. Läuft im Browser,
 lässt sich als App auf den Home-Bildschirm legen und funktioniert danach auch ohne Netz.
 
+![Icon](icon-192.png)
 
 ## Funktionen
 
@@ -35,8 +36,9 @@ lässt sich als App auf den Home-Bildschirm legen und funktioniert danach auch o
 - Jede Runde, jeder Einkauf, jede Korrektur mit Uhrzeit
 - Letzter Eintrag lässt sich vollständig zurücknehmen, inklusive Dealerwechsel
 
-**Regeln**
+**Einstellungen** (Zahnrad oben rechts)
 
+- Sprache der Oberfläche: Deutsch oder Englisch, inklusive Zahlen- und Datumsformat
 - Blackjack zahlt 3:2, 6:5 oder 2:1
 - Schrittweite 0,25 €, 0,50 € oder 1,00 €
 - Aufgabe und Versicherung abschaltbar
@@ -100,10 +102,13 @@ Tabs. Unter *Regeln → Speicher* steht, was gerade gilt.
 
 ## Aktualisieren
 
-Nach jeder Änderung an `index.html` in `sw.js` die Zeile `const VERSION = 'kladde-v1';`
+Nach jeder Änderung an `index.html` in `sw.js` die Zeile `const VERSION = 'kladde-v2';`
 hochzählen. Sonst behalten bereits installierte Geräte die alte Fassung aus dem Cache.
 
 ## Anpassen
+
+Alle Oberflächentexte liegen im Objekt `TEXTE` im Skriptteil von `index.html`, je ein Block
+für Deutsch und Englisch. Weitere Sprachen lassen sich dort als zusätzlicher Block ergänzen.
 
 Farben, Abstände und Schriften stecken in den CSS-Variablen ganz oben in `index.html`,
 sowohl für das dunkle als auch für das helle Thema. Die Chipfarben der Salden-Anzeige

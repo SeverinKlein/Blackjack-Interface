@@ -1,7 +1,7 @@
 /* Service Worker der Blackjack-Kladde.
    Bei jeder Änderung an index.html die Version hochzählen,
    sonst behalten installierte Geräte die alte Fassung. */
-const VERSION = 'kladde-v1';
+const VERSION = 'kladde-v2';
 const DATEIEN = [
   '.', 'index.html', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'

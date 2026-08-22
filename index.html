@@ -35,8 +35,17 @@
   body::before{content:"";position:fixed;inset:0;background:var(--filz);z-index:-1;pointer-events:none}
   button{touch-action:manipulation}
   .app{max-width:560px;margin:0 auto;padding:env(safe-area-inset-top) 12px calc(150px + env(safe-area-inset-bottom))}
-  .topbar{padding:14px 2px 2px;display:flex;align-items:baseline;justify-content:space-between}
-  .marke{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--messing)}
+  .topbar{padding:14px 2px 2px;display:flex;align-items:center;gap:10px}
+  .marke{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--messing);margin-right:auto}
+  .zahnrad{background:transparent;border:1px solid var(--linie);border-radius:8px;color:var(--leise);
+           font-size:15px;line-height:1;width:34px;height:34px;cursor:pointer;flex:0 0 auto}
+  .zahnrad:hover{color:var(--kreide);border-color:var(--messing)}
+  #overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;overflow-y:auto}
+  .blatt{max-width:560px;margin:0 auto;min-height:100%;background:var(--filz);
+         padding:0 12px calc(40px + env(safe-area-inset-bottom))}
+  .blattkopf{position:sticky;top:0;background:var(--filz);display:flex;align-items:center;gap:10px;
+             padding:calc(12px + env(safe-area-inset-top)) 0 10px;border-bottom:1px solid var(--linie);z-index:1}
+  .blattkopf .titel3{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--messing);margin-right:auto}
   .runde{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--leise);text-transform:uppercase}
   .arc{display:block;width:100%;height:50px;margin:-2px 0 4px}
   .arc text{fill:var(--kreide);font-family:var(--sans);font-size:12px;letter-spacing:2.4px;text-transform:uppercase;opacity:.85}
@@ -148,7 +157,8 @@
 <div class="app">
   <div class="topbar">
     <div class="marke">Kladde</div>
-    <div class="runde">Runde <span id="rundeNr">1</span></div>
+    <div class="runde" id="rundeLbl">Runde 1</div>
+    <button class="zahnrad" id="settingsBtn" data-akt="settingsAuf" aria-label="Einstellungen">⚙</button>
   </div>
   <svg class="arc" viewBox="0 0 340 50" aria-hidden="true">
     <path id="bogen" d="M14,46 A170,170 0 0,1 326,46"></path>
@@ -159,7 +169,6 @@
     <button class="tab is-on" data-tab="spiel">Spiel</button>
     <button class="tab" data-tab="verlauf">Verlauf</button>
     <button class="tab" data-tab="kasse">Kasse</button>
-    <button class="tab" data-tab="regeln">Regeln</button>
   </div>
 
   <div id="panel-spiel">
@@ -172,7 +181,6 @@
   </div>
   <div id="panel-verlauf" hidden></div>
   <div id="panel-kasse" hidden></div>
-  <div id="panel-regeln" hidden></div>
 </div>
 
 <div class="footer">
@@ -181,7 +189,17 @@
       <div class="lbl2" id="bankLbl">Bank</div>
       <div class="wert" id="bankWert">0,00 €</div>
     </div>
-    <button class="abschluss" id="abschluss">Runde abschließen<small id="gewertet">nichts gewertet</small></button>
+    <button class="abschluss" id="abschluss"><span id="abschlussText">Runde abschließen</span><small id="gewertet">nichts gewertet</small></button>
+  </div>
+</div>
+
+<div id="overlay" hidden>
+  <div class="blatt">
+    <div class="blattkopf">
+      <span class="titel3" id="settingsTitel">Einstellungen</span>
+      <button class="knopf geist" data-akt="settingsZu" id="settingsZu">Fertig</button>
+    </div>
+    <div id="panel-regeln"></div>
   </div>
 </div>
 
@@ -191,16 +209,134 @@ const KEY = 'blackjack:kladde:v2';
 const STD = {
   runde:1, standard:50, schritt:50, bjFaktor:1.5,
   aufgabeAn:true, versAn:true, bankModus:'haus', dealerId:null,
-  bank:0, einsaetzeBehalten:true, dealerBJ:false, thema:'dunkel',
+  bank:0, einsaetzeBehalten:true, dealerBJ:false, thema:'dunkel', sprache:'de',
   spieler:[], verlauf:[]
 };
 let S = JSON.parse(JSON.stringify(STD));
-let tab = 'spiel', resetArmiert = false, kasseOffen = null;
+let tab = 'spiel', resetArmiert = false, kasseOffen = null, settingsOffen = false;
+
+/* ---------- Sprache ---------- */
+const TEXTE = {
+  de: {
+    titel:'Blackjack-Kladde', runde:'Runde {0}',
+    tab_spiel:'Spiel', tab_verlauf:'Verlauf', tab_kasse:'Kasse',
+    einstellungen:'Einstellungen', fertig:'Fertig', einstellungenAria:'Einstellungen öffnen',
+    bj32:'Blackjack zahlt 3 zu 2', bj65:'Blackjack zahlt 6 zu 5', bj21:'Blackjack zahlt 2 zu 1',
+    namePlatz:'Name eintragen', aufnehmen:'Aufnehmen',
+    bank:'Bank', tisch:'Tisch', dealer:'Dealer',
+    rundeAb:'Runde abschließen', nichtsGewertet:'nichts gewertet', gewertetVon:'{0} von {1} gewertet',
+    dealerIst:'Dealer: {0}', keinDealer:'noch keiner', weitergeben:'weitergeben',
+    bankHaus:'Bank hält das Haus', ohneBank:'ohne Bankkonto',
+    dealerBust:'Dealer überkauft', dealerGewinnt:'Dealer gewinnt', allesPush:'Alles Push',
+    leeren:'Leeren', dealerHatBJ:'Dealer hat Blackjack',
+    leerHinweis:'Noch niemand am Tisch. Namen eintragen, Einsätze stellen, nach jeder Runde abhaken. Die Reihenfolge kannst du später mit den Pfeilen auf jeder Karte ändern.',
+    dealerHinweis:'Gibt diese Runde die Karten und bekommt die Gegenbuchung aller Gewinne und Verluste.',
+    pauseHinweis:'Setzt diese Runde aus.',
+    pause:'Pause', zurueck:'Zurück', vomTisch:'Vom Tisch',
+    dieseRunde:'Diese Runde {0}', nochOffen:'Noch offen',
+    nachOben:'nach oben', nachUnten:'nach unten', nameAria:'Name',
+    hand:'Hand {0}', einsatz:'Einsatz', weniger:'weniger', mehr:'mehr', fuerAlle:'für alle',
+    gewinn:'Gewinn', push:'Push', verlust:'Verlust', blackjack:'Blackjack', aufgabe:'Aufgabe',
+    split:'Split', handWeg:'Hand weg', versicherung:'Versicherung {0}', nichtGesetzt:'nicht gesetzt',
+    beiNull:'bei null',
+    verlaufLeer:'Hier landet jede abgeschlossene Runde, jeder Einkauf und jede Korrektur. Solange nichts drinsteht, gibt es auch nichts zurückzunehmen.',
+    einkauf:'Einkauf', korrektur:'Korrektur', weg:'Weg',
+    undoBtn:'Letzten Eintrag zurücknehmen', eintraege:'{0} Einträge',
+    einkaufText:'{0}: Einkauf {1}, insgesamt {2}', korrText:'{0}: {1} von Hand gebucht',
+    statZeile:'{0} {1} · {2} gewonnen · {3} verloren · {4} Push · {5} BJ', hand1:'Hand', handN:'Hände',
+    kassenZeile:'Einkauf {0} · Auszahlung {1}',
+    bankHausLabel:'Bank (Haus)', zahltAn:'{0} zahlt an {1}',
+    ausgeglichen:'Alles ausgeglichen, niemand schuldet etwas.',
+    kontostaende:'Kontostände (tippen für Einkauf und Korrektur)',
+    ausgleichEnde:'Ausgleich am Ende', notizzettel:'Notizzettel',
+    exportBtn:'Abrechnung als Text erzeugen',
+    einkaufBuchen:'Einkauf buchen', saldoKorrigieren:'Saldo von Hand korrigieren',
+    betragPlatz:'Betrag, z. B. 2,50',
+    auszahlungTitel:'Auszahlung', bjZahlt:'Blackjack zahlt', schrittweite:'Schrittweite Einsatz',
+    standardEinsatz:'Standardeinsatz neuer Spieler',
+    zusatzregeln:'Zusatzregeln', aufgabeLabel:'Aufgabe (Surrender)', versicherungLabel:'Versicherung',
+    behaltenLabel:'Einsätze nach der Runde behalten', an:'an', aus:'aus',
+    werBank:'Wer hält die Bank', bankkonto:'Bankkonto', haus:'Haus', spielerOpt:'Spieler', keins:'keins',
+    bankHinweis:'Haus: ein eigenes Bankkonto sammelt alle Gegenbuchungen. Spieler: der Dealer am Tisch bekommt sie gutgeschrieben und kann nach jeder Runde weitergegeben werden. Keins: nur die Spielersalden zählen.',
+    speicherTitel:'Speicher', speicherSatz:'Stände werden {0}.',
+    speicherClaude:'in Claude gesichert', speicherBrowser:'in diesem Browser gesichert',
+    speicherAus:'nicht gesichert, sie gelten nur bis zum Schließen',
+    darstellung:'Darstellung', farben:'Farben', filzgruen:'Filzgrün', hell:'Hell',
+    spracheTitel:'Sprache', spracheLabel:'Sprache der Oberfläche',
+    aufraeumen:'Aufräumen', saldenNull:'Salden auf null, Spieler bleiben',
+    allesLoeschen:'Alles zurücksetzen', wirklich:'Wirklich alles löschen? Nochmal tippen',
+    exportKopf:'Blackjack-Abrechnung, {0}', exportRunden:'{0} Runden, {1}',
+    exportSpieler:'{0}: {1}  (Einkauf {2}, Auszahlung {3})', exportBank:'Bank: {0}',
+    exportAusgleich:'Ausgleich:', exportZahlt:'{0} zahlt {1} an {2}',
+    fehler:'Fehler: ', unbekannt:'unbekannt', ladenFehler:'Laden: ', anzeigeFehler:'Anzeige: '
+  },
+  en: {
+    titel:'Blackjack Ledger', runde:'Round {0}',
+    tab_spiel:'Game', tab_verlauf:'History', tab_kasse:'Cash',
+    einstellungen:'Settings', fertig:'Done', einstellungenAria:'Open settings',
+    bj32:'Blackjack pays 3 to 2', bj65:'Blackjack pays 6 to 5', bj21:'Blackjack pays 2 to 1',
+    namePlatz:'Enter a name', aufnehmen:'Add',
+    bank:'Bank', tisch:'Table', dealer:'Dealer',
+    rundeAb:'Finish round', nichtsGewertet:'nothing scored', gewertetVon:'{0} of {1} scored',
+    dealerIst:'Dealer: {0}', keinDealer:'nobody yet', weitergeben:'pass on',
+    bankHaus:'The house holds the bank', ohneBank:'no bank account',
+    dealerBust:'Dealer busts', dealerGewinnt:'Dealer wins', allesPush:'All push',
+    leeren:'Clear', dealerHatBJ:'Dealer has blackjack',
+    leerHinweis:'Nobody at the table yet. Add names, set the bets, tick off the results after each round. You can reorder players later with the arrows on each card.',
+    dealerHinweis:'Deals this round and receives the counter entry for every win and loss.',
+    pauseHinweis:'Sitting out this round.',
+    pause:'Pause', zurueck:'Back', vomTisch:'Remove',
+    dieseRunde:'This round {0}', nochOffen:'Not scored yet',
+    nachOben:'move up', nachUnten:'move down', nameAria:'Name',
+    hand:'Hand {0}', einsatz:'Bet', weniger:'lower', mehr:'raise', fuerAlle:'all players',
+    gewinn:'Win', push:'Push', verlust:'Loss', blackjack:'Blackjack', aufgabe:'Surrender',
+    split:'Split', handWeg:'Remove hand', versicherung:'Insurance {0}', nichtGesetzt:'not placed',
+    beiNull:'at zero',
+    verlaufLeer:'Every finished round, buy-in and adjustment lands here. While it is empty there is nothing to undo.',
+    einkauf:'Buy-in', korrektur:'Adjustment', weg:'Gone',
+    undoBtn:'Undo last entry', eintraege:'{0} entries',
+    einkaufText:'{0}: buy-in {1}, {2} in total', korrText:'{0}: {1} entered by hand',
+    statZeile:'{0} {1} · {2} won · {3} lost · {4} push · {5} BJ', hand1:'hand', handN:'hands',
+    kassenZeile:'Buy-in {0} · Payout {1}',
+    bankHausLabel:'Bank (house)', zahltAn:'{0} pays {1}',
+    ausgeglichen:'All settled, nobody owes anything.',
+    kontostaende:'Balances (tap for buy-in and adjustment)',
+    ausgleichEnde:'Settling up', notizzettel:'Note',
+    exportBtn:'Create settlement as text',
+    einkaufBuchen:'Record a buy-in', saldoKorrigieren:'Adjust balance by hand',
+    betragPlatz:'Amount, e.g. 2.50',
+    auszahlungTitel:'Payouts', bjZahlt:'Blackjack pays', schrittweite:'Bet increment',
+    standardEinsatz:'Default bet for new players',
+    zusatzregeln:'Optional rules', aufgabeLabel:'Surrender', versicherungLabel:'Insurance',
+    behaltenLabel:'Keep bets after each round', an:'on', aus:'off',
+    werBank:'Who holds the bank', bankkonto:'Bank account', haus:'House', spielerOpt:'Player', keins:'none',
+    bankHinweis:'House: a separate bank account collects every counter entry. Player: the dealer at the table is credited with them and can pass the deal on after each round. None: only the player balances count.',
+    speicherTitel:'Storage', speicherSatz:'Balances are {0}.',
+    speicherClaude:'saved inside Claude', speicherBrowser:'saved in this browser',
+    speicherAus:'not saved, they only last until you close the app',
+    darstellung:'Appearance', farben:'Colours', filzgruen:'Felt green', hell:'Light',
+    spracheTitel:'Language', spracheLabel:'Interface language',
+    aufraeumen:'Clearing up', saldenNull:'Balances to zero, keep players',
+    allesLoeschen:'Reset everything', wirklich:'Really delete everything? Tap again',
+    exportKopf:'Blackjack settlement, {0}', exportRunden:'{0} rounds, {1}',
+    exportSpieler:'{0}: {1}  (buy-in {2}, payout {3})', exportBank:'Bank: {0}',
+    exportAusgleich:'Settling up:', exportZahlt:'{0} pays {1} to {2}',
+    fehler:'Error: ', unbekannt:'unknown', ladenFehler:'Loading: ', anzeigeFehler:'Display: '
+  }
+};
+function t(k, ...a){
+  const wb = TEXTE[S.sprache] || TEXTE.de;
+  let s = wb[k] !== undefined ? wb[k] : (TEXTE.de[k] !== undefined ? TEXTE.de[k] : k);
+  a.forEach((v,i)=>{ s = s.split('{'+i+'}').join(v); });
+  return s;
+}
+const loc = () => S.sprache==='en' ? 'en-IE' : 'de-DE';
 
 /* ---------- Rechnen ---------- */
-const eur  = c => (c/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+const eur  = c => (c/100).toLocaleString(loc(),{style:'currency',currency:'EUR'});
 const eurS = c => (c>0?'+':c<0?'−':'') + eur(Math.abs(c));
 const vz   = c => c>0?'pos':c<0?'neg':'neutral';
+const uhr  = () => new Date().toLocaleTimeString(loc(),{hour:'2-digit',minute:'2-digit'});
 
 function handDelta(h){
   const e = h.einsatz, f = h.double ? 2*e : e;
@@ -227,8 +363,7 @@ const gewertet = p => spielt(p) && (p.haende.some(h=>h.ergebnis) || (S.versAn &&
 const lager = (()=>{ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return localStorage; }
                     catch(e){ return null; } })();
 const speicherModus = window.storage ? 'claude' : (lager ? 'browser' : 'aus');
-const speicherText = {claude:'in Claude gesichert', browser:'in diesem Browser gesichert',
-                      aus:'kein Speicher verfügbar, Stände gelten nur bis zum Schließen'}[speicherModus];
+const speicherText = () => t({claude:'speicherClaude', browser:'speicherBrowser', aus:'speicherAus'}[speicherModus]);
 
 async function speichern(){
   const text = JSON.stringify(S);
@@ -260,24 +395,36 @@ const WERTE = [[1000,'var(--chip-schwarz)'],[500,'var(--chip-blau)'],[100,'var(-
 function stapel(cents){
   let rest = Math.abs(cents), out = [];
   for(const [w,f] of WERTE){ while(rest>=w && out.length<14){ out.push(f); rest-=w; } }
-  if(!out.length) return '<span class="leer">bei null</span>';
+  if(!out.length) return `<span class="leer">${t('beiNull')}</span>`;
   return out.map(f=>`<span class="chip" style="background:${f}"></span>`).join('');
 }
 const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const el = id => document.getElementById(id);
-const bjText = () => S.bjFaktor===1.5?'Blackjack zahlt 3 zu 2':S.bjFaktor===1.2?'Blackjack zahlt 6 zu 5':'Blackjack zahlt 2 zu 1';
+const bjText = () => S.bjFaktor===1.5 ? t('bj32') : S.bjFaktor===1.2 ? t('bj65') : t('bj21');
 
 /* ---------- Rendern ---------- */
 function render(){
   document.documentElement.setAttribute('data-thema', S.thema==='hell'?'hell':'dunkel');
-  el('rundeNr').textContent = S.runde;
+  document.documentElement.lang = S.sprache;
+  document.title = t('titel');
+  el('rundeLbl').textContent = t('runde', S.runde);
   el('bogenText').textContent = bjText();
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('is-on', t.dataset.tab===tab));
-  ['spiel','verlauf','kasse','regeln'].forEach(t=>el('panel-'+t).hidden = tab!==t);
+  el('settingsBtn').setAttribute('aria-label', t('einstellungenAria'));
+  el('settingsTitel').textContent = t('einstellungen');
+  el('settingsZu').textContent = t('fertig');
+  el('neuName').placeholder = t('namePlatz');
+  el('addBtn').textContent = t('aufnehmen');
+  el('abschlussText').textContent = t('rundeAb');
+  document.querySelectorAll('.tab').forEach(x=>{
+    x.textContent = t('tab_'+x.dataset.tab);
+    x.classList.toggle('is-on', x.dataset.tab===tab);
+  });
+  ['spiel','verlauf','kasse'].forEach(x=>el('panel-'+x).hidden = tab!==x);
   if(tab==='spiel'){ renderDealerLeiste(); renderSpiel(); }
   if(tab==='verlauf') renderVerlauf();
   if(tab==='kasse') renderKasse();
-  if(tab==='regeln') renderRegeln();
+  el('overlay').hidden = !settingsOffen;
+  if(settingsOffen) renderRegeln();
   renderFooter();
 }
 
@@ -287,18 +434,18 @@ function renderDealerLeiste(){
   el('dealerLeiste').innerHTML = `
     <div class="leiste">
       <div class="kopfzeile">
-        <span class="titel">Tisch</span>
+        <span class="titel">${t('tisch')}</span>
         ${S.bankModus==='spieler'
-          ? `<span class="dealername">Dealer: ${d?esc(d.name):'noch keiner'}</span>
-             <button class="mod" data-akt="dealerWeiter">weitergeben</button>`
-          : `<span class="dealername">${S.bankModus==='haus'?'Bank hält das Haus':'ohne Bankkonto'}</span>`}
+          ? `<span class="dealername">${t('dealerIst', d?esc(d.name):t('keinDealer'))}</span>
+             <button class="mod" data-akt="dealerWeiter">${t('weitergeben')}</button>`
+          : `<span class="dealername">${S.bankModus==='haus'?t('bankHaus'):t('ohneBank')}</span>`}
       </div>
       <div class="schnell">
-        <button data-akt="alle" data-e="gewinn">Dealer überkauft</button>
-        <button data-akt="alle" data-e="verlust">Dealer gewinnt</button>
-        <button data-akt="alle" data-e="push">Alles Push</button>
-        <button data-akt="alleLeeren">Leeren</button>
-        ${S.versAn?`<button class="warnung" data-akt="dealerBJ" aria-pressed="${S.dealerBJ}">Dealer hat Blackjack</button>`:''}
+        <button data-akt="alle" data-e="gewinn">${t('dealerBust')}</button>
+        <button data-akt="alle" data-e="verlust">${t('dealerGewinnt')}</button>
+        <button data-akt="alle" data-e="push">${t('allesPush')}</button>
+        <button data-akt="alleLeeren">${t('leeren')}</button>
+        ${S.versAn?`<button class="warnung" data-akt="dealerBJ" aria-pressed="${S.dealerBJ}">${t('dealerHatBJ')}</button>`:''}
       </div>
     </div>`;
 }
@@ -306,35 +453,33 @@ function renderDealerLeiste(){
 function renderSpiel(){
   const box = el('liste');
   if(!S.spieler.length){
-    box.innerHTML = `<p class="hinweis">Noch niemand am Tisch. Namen eintragen, Einsätze stellen,
-      nach jeder Runde abhaken. Die Reihenfolge kannst du später mit den Pfeilen auf jeder Karte ändern.</p>`;
+    box.innerHTML = `<p class="hinweis">${t('leerHinweis')}</p>`;
     return;
   }
   box.innerHTML = S.spieler.map((p,pi)=>{
     const d = spielerDelta(p), dealer = istDealer(p);
     const koerper = dealer
-      ? `<p class="hinweis" style="margin:6px 0 0">Gibt diese Runde die Karten und bekommt die Gegenbuchung
-         aller Gewinne und Verluste.</p>`
+      ? `<p class="hinweis" style="margin:6px 0 0">${t('dealerHinweis')}</p>`
       : p.pausiert
-      ? `<p class="hinweis" style="margin:6px 0 0">Setzt diese Runde aus.</p>`
+      ? `<p class="hinweis" style="margin:6px 0 0">${t('pauseHinweis')}</p>`
       : p.haende.map((h,hi)=>handHtml(p,pi,h,hi)).join('');
     return `
       <article class="karte ${dealer?'dealer':''} ${p.pausiert?'pausiert':''}">
         <div class="kopf">
-          <input class="name" value="${esc(p.name)}" data-akt="name" data-p="${pi}" aria-label="Name">
-          ${dealer?'<span class="marker">Dealer</span>':''}
-          ${p.pausiert?'<span class="marker">Pause</span>':''}
+          <input class="name" value="${esc(p.name)}" data-akt="name" data-p="${pi}" aria-label="${t('nameAria')}">
+          ${dealer?`<span class="marker">${t('dealer')}</span>`:''}
+          ${p.pausiert?`<span class="marker">${t('pause')}</span>`:''}
           <div class="saldo ${vz(p.saldo)}">${eurS(p.saldo)}</div>
         </div>
         <div class="stapel">${stapel(p.saldo)}</div>
         ${koerper}
         <div class="fuss">
-          <span class="vorschau ${vz(d)}">${gewertet(p)?'Diese Runde '+eurS(d):dealer||p.pausiert?'':'Noch offen'}</span>
-          <button class="klein" data-akt="hoch" data-p="${pi}" ${pi===0?'disabled':''} aria-label="nach oben">↑</button>
-          <button class="klein" data-akt="runter" data-p="${pi}" ${pi===S.spieler.length-1?'disabled':''} aria-label="nach unten">↓</button>
-          ${S.bankModus==='spieler'?`<button class="klein" data-akt="setzeDealer" data-p="${pi}">Dealer</button>`:''}
-          <button class="klein" data-akt="pause" data-p="${pi}">${p.pausiert?'Zurück':'Pause'}</button>
-          <button class="klein gefahr" data-akt="entfernen" data-p="${pi}">Vom Tisch</button>
+          <span class="vorschau ${vz(d)}">${gewertet(p)?t('dieseRunde', eurS(d)):dealer||p.pausiert?'':t('nochOffen')}</span>
+          <button class="klein" data-akt="hoch" data-p="${pi}" ${pi===0?'disabled':''} aria-label="${t('nachOben')}">↑</button>
+          <button class="klein" data-akt="runter" data-p="${pi}" ${pi===S.spieler.length-1?'disabled':''} aria-label="${t('nachUnten')}">↓</button>
+          ${S.bankModus==='spieler'?`<button class="klein" data-akt="setzeDealer" data-p="${pi}">${t('dealer')}</button>`:''}
+          <button class="klein" data-akt="pause" data-p="${pi}">${p.pausiert?t('zurueck'):t('pause')}</button>
+          <button class="klein gefahr" data-akt="entfernen" data-p="${pi}">${t('vomTisch')}</button>
         </div>
       </article>`;
   }).join('');
@@ -345,37 +490,37 @@ function handHtml(p,pi,h,hi){
   return `
     <div class="hand">
       <div class="handkopf">
-        <span class="lbl">${p.haende.length>1?'Hand '+(hi+1):'Einsatz'}</span>
-        <button class="step" data-akt="minus" data-p="${pi}" data-h="${hi}" aria-label="weniger">−</button>
+        <span class="lbl">${p.haende.length>1?t('hand', hi+1):t('einsatz')}</span>
+        <button class="step" data-akt="minus" data-p="${pi}" data-h="${hi}" aria-label="${t('weniger')}">−</button>
         <span class="einsatz">${eur(h.einsatz)}</span>
-        <button class="step" data-akt="plus" data-p="${pi}" data-h="${hi}" aria-label="mehr">+</button>
+        <button class="step" data-akt="plus" data-p="${pi}" data-h="${hi}" aria-label="${t('mehr')}">+</button>
         <button class="mod" data-akt="double" data-p="${pi}" data-h="${hi}" aria-pressed="${!!h.double}">×2</button>
       </div>
       <div class="quick">
         ${quick.map(q=>`<button data-akt="setzeEinsatz" data-p="${pi}" data-h="${hi}" data-w="${q}"
           class="${h.einsatz===q?'aktiv':''}">${eur(q)}</button>`).join('')}
-        <button data-akt="einsatzAlle" data-p="${pi}" data-h="${hi}">für alle</button>
+        <button data-akt="einsatzAlle" data-p="${pi}" data-h="${hi}">${t('fuerAlle')}</button>
       </div>
       <div class="reihe">
-        ${[['gewinn','Gewinn'],['push','Push'],['verlust','Verlust']].map(([e,t])=>`
+        ${['gewinn','push','verlust'].map(e=>`
           <button class="erg ${e}" data-akt="erg" data-e="${e}" data-p="${pi}" data-h="${hi}"
-            aria-pressed="${h.ergebnis===e}">${t}</button>`).join('')}
+            aria-pressed="${h.ergebnis===e}">${t(e)}</button>`).join('')}
       </div>
       <div class="reihe">
         <button class="erg bj" data-akt="erg" data-e="bj" data-p="${pi}" data-h="${hi}" aria-pressed="${h.ergebnis==='bj'}">
-          Blackjack<small>${eurS(Math.round(h.einsatz*S.bjFaktor))}</small></button>
+          ${t('blackjack')}<small>${eurS(Math.round(h.einsatz*S.bjFaktor))}</small></button>
         ${S.aufgabeAn?`<button class="erg aufgabe" data-akt="erg" data-e="aufgabe" data-p="${pi}" data-h="${hi}" aria-pressed="${h.ergebnis==='aufgabe'}">
-          Aufgabe<small>${eurS(-Math.round(h.einsatz/2))}</small></button>`:''}
+          ${t('aufgabe')}<small>${eurS(-Math.round(h.einsatz/2))}</small></button>`:''}
         ${hi===0
-          ? `<button class="erg" data-akt="split" data-p="${pi}" ${p.haende.length>=4?'disabled':''}>Split</button>`
-          : `<button class="erg" data-akt="unsplit" data-p="${pi}" data-h="${hi}">Hand weg</button>`}
+          ? `<button class="erg" data-akt="split" data-p="${pi}" ${p.haende.length>=4?'disabled':''}>${t('split')}</button>`
+          : `<button class="erg" data-akt="unsplit" data-p="${pi}" data-h="${hi}">${t('handWeg')}</button>`}
       </div>
       ${(S.versAn && hi===0)?`
       <div class="reihe">
         <button class="erg" data-akt="vers" data-p="${pi}" aria-pressed="${!!h.vers}"
           style="${h.vers?'border-color:var(--messing);color:var(--messing)':''}">
-          Versicherung ${eur(Math.round(h.einsatz/2))}
-          <small>${h.vers?(S.dealerBJ?eurS(h.einsatz):eurS(-Math.round(h.einsatz/2))):'nicht gesetzt'}</small></button>
+          ${t('versicherung', eur(Math.round(h.einsatz/2)))}
+          <small>${h.vers?(S.dealerBJ?eurS(h.einsatz):eurS(-Math.round(h.einsatz/2))):t('nichtGesetzt')}</small></button>
       </div>`:''}
     </div>`;
 }
@@ -383,37 +528,44 @@ function handHtml(p,pi,h,hi){
 function renderFooter(){
   const n = S.spieler.filter(gewertet).length, aktive = S.spieler.filter(spielt).length;
   el('abschluss').disabled = n===0;
-  el('gewertet').textContent = n===0 ? 'nichts gewertet' : `${n} von ${aktive} gewertet`;
+  el('gewertet').textContent = n===0 ? t('nichtsGewertet') : t('gewertetVon', n, aktive);
   const d = S.spieler.find(istDealer);
-  el('bankLbl').textContent = S.bankModus==='spieler' ? (d?esc(d.name):'Dealer') : S.bankModus==='haus' ? 'Bank' : 'Tisch';
+  el('bankLbl').textContent = S.bankModus==='spieler' ? (d?d.name:t('dealer')) : S.bankModus==='haus' ? t('bank') : t('tisch');
   const w = S.bankModus==='spieler' ? (d?d.saldo:0) : S.bankModus==='haus' ? S.bank : S.spieler.reduce((s,p)=>s+p.saldo,0);
   el('bankWert').textContent = eurS(w);
   el('bankWert').className = 'wert ' + vz(w);
 }
 
+function eintragText(r){
+  const p = S.spieler.find(x=>x.id===r.id);
+  const name = p ? p.name : t('weg');
+  if(r.text) return r.text;
+  if(r.typ==='einkauf') return t('einkaufText', name, eur(r.betrag||0), eur(p?p.einkauf:0));
+  return t('korrText', name, eurS(r.betrag||0));
+}
+
 function renderVerlauf(){
   const p = el('panel-verlauf');
   if(!S.verlauf.length){
-    p.innerHTML = `<p class="hinweis">Hier landet jede abgeschlossene Runde, jeder Einkauf und jede Korrektur.
-      Solange nichts drinsteht, gibt es auch nichts zurückzunehmen.</p>`;
+    p.innerHTML = `<p class="hinweis">${t('verlaufLeer')}</p>`;
     return;
   }
   const rows = [...S.verlauf].reverse().map(r=>{
     if(r.typ!=='runde'){
-      return `<div class="block"><div class="titel2"><span>${r.typ==='einkauf'?'Einkauf':'Korrektur'}</span><span>${r.zeit||''}</span></div>
-        <span class="hinweis">${esc(r.text||'')}</span></div>`;
+      return `<div class="block"><div class="titel2"><span>${r.typ==='einkauf'?t('einkauf'):t('korrektur')}</span><span>${r.zeit||''}</span></div>
+        <span class="hinweis">${esc(eintragText(r))}</span></div>`;
     }
     return `<div class="block">
-      <div class="titel2"><span>Runde ${r.runde}</span><span>${r.zeit||''}</span></div>
+      <div class="titel2"><span>${t('runde', r.runde)}</span><span>${r.zeit||''}</span></div>
       ${Object.entries(r.deltas).map(([id,c])=>{
         const q = S.spieler.find(x=>x.id===id);
-        return `<span class="badge ${vz(c)}">${esc(q?q.name:'Weg')} ${eurS(c)}</span>`;
+        return `<span class="badge ${vz(c)}">${esc(q?q.name:t('weg'))} ${eurS(c)}</span>`;
       }).join('')}
-      ${r.bank?`<span class="badge ${vz(r.bank)}">Bank ${eurS(r.bank)}</span>`:''}
+      ${r.bank?`<span class="badge ${vz(r.bank)}">${t('bank')} ${eurS(r.bank)}</span>`:''}
     </div>`;
   }).join('');
-  p.innerHTML = `<button class="knopf geist" style="width:100%" data-akt="undo">Letzten Eintrag zurücknehmen</button>
-    <div class="abschnitt">${S.verlauf.length} Einträge</div>${rows}`;
+  p.innerHTML = `<button class="knopf geist" style="width:100%" data-akt="undo">${t('undoBtn')}</button>
+    <div class="abschnitt">${t('eintraege', S.verlauf.length)}</div>${rows}`;
 }
 
 function statistik(){
@@ -442,38 +594,38 @@ function renderKasse(){
     const auf = kasseOffen===x.id;
     return `<div class="zeile" data-akt="kasseAuf" data-id="${x.id}" style="cursor:pointer">
         <span class="wer">${esc(x.name)}
-          <span class="unter">${s.h} Hände · ${s.g} gewonnen · ${s.v} verloren · ${s.pu} Push · ${s.bj} BJ</span>
-          <span class="unter">Einkauf ${eur(x.einkauf)} · Auszahlung ${eur(x.einkauf+x.saldo)}</span>
+          <span class="unter">${t('statZeile', s.h, s.h===1?t('hand1'):t('handN'), s.g, s.v, s.pu, s.bj)}</span>
+          <span class="unter">${t('kassenZeile', eur(x.einkauf), eur(x.einkauf+x.saldo))}</span>
         </span>
         <span class="zahl ${vz(x.saldo)}">${eurS(x.saldo)}</span>
       </div>
       ${auf?kassePanel(x):''}`;
   }).join('');
   const bankZeile = S.bankModus==='haus'
-    ? `<div class="zeile"><span class="wer" style="color:var(--messing)">Bank (Haus)</span>
+    ? `<div class="zeile"><span class="wer" style="color:var(--messing)">${t('bankHausLabel')}</span>
        <span class="zahl ${vz(S.bank)}">${eurS(S.bank)}</span></div>` : '';
-  const t = ausgleich();
-  const trans = t.length
-    ? t.map(x=>`<div class="zeile"><span class="wer">${esc(x.von)} zahlt an ${esc(x.an)}</span>
+  const liste = ausgleich();
+  const trans = liste.length
+    ? liste.map(x=>`<div class="zeile"><span class="wer">${t('zahltAn', esc(x.von), esc(x.an))}</span>
         <span class="zahl">${eur(x.betrag)}</span></div>`).join('')
-    : `<p class="hinweis">Alles ausgeglichen, niemand schuldet etwas.</p>`;
+    : `<p class="hinweis">${t('ausgeglichen')}</p>`;
   el('panel-kasse').innerHTML = `
-    <div class="abschnitt">Kontostände (tippen für Einkauf und Korrektur)</div>${stand}${bankZeile}
-    <div class="abschnitt">Ausgleich am Ende</div>${trans}
-    <div class="abschnitt">Notizzettel</div>
-    <button class="knopf geist" style="width:100%" data-akt="export">Abrechnung als Text erzeugen</button>
+    <div class="abschnitt">${t('kontostaende')}</div>${stand}${bankZeile}
+    <div class="abschnitt">${t('ausgleichEnde')}</div>${trans}
+    <div class="abschnitt">${t('notizzettel')}</div>
+    <button class="knopf geist" style="width:100%" data-akt="export">${t('exportBtn')}</button>
     <div id="exportBox"></div>`;
 }
 
 function kassePanel(x){
   return `<div class="kassefeld">
-    <div class="lbl2" style="margin-bottom:6px">Einkauf buchen</div>
+    <div class="lbl2" style="margin-bottom:6px">${t('einkaufBuchen')}</div>
     <div class="schnell" style="margin-bottom:10px">
       ${[500,1000,2000,5000].map(c=>`<button data-akt="einkauf" data-id="${x.id}" data-w="${c}">+ ${eur(c)}</button>`).join('')}
     </div>
-    <div class="lbl2" style="margin-bottom:6px">Saldo von Hand korrigieren</div>
+    <div class="lbl2" style="margin-bottom:6px">${t('saldoKorrigieren')}</div>
     <div class="addrow">
-      <input class="feld" id="korr-${x.id}" inputmode="decimal" placeholder="Betrag, z. B. 2,50">
+      <input class="feld" id="korr-${x.id}" inputmode="decimal" placeholder="${t('betragPlatz')}">
       <button class="knopf geist" data-akt="korr" data-id="${x.id}" data-r="plus">+</button>
       <button class="knopf geist" data-akt="korr" data-id="${x.id}" data-r="minus">−</button>
     </div>
@@ -482,7 +634,7 @@ function kassePanel(x){
 
 function ausgleich(){
   let konten = S.spieler.map(p=>({name:p.name, c:p.saldo}));
-  if(S.bankModus==='haus') konten.push({name:'Bank', c:S.bank});
+  if(S.bankModus==='haus') konten.push({name:t('bank'), c:S.bank});
   const minus = konten.filter(k=>k.c<0).map(k=>({...k,c:-k.c})).sort((a,b)=>b.c-a.c);
   const plus  = konten.filter(k=>k.c>0).sort((a,b)=>b.c-a.c);
   const out=[]; let i=0,j=0;
@@ -499,54 +651,62 @@ function ausgleich(){
 function renderRegeln(){
   const w = (akt,val,txt,cur)=>`<button data-akt="${akt}" data-w="${val}" aria-pressed="${cur}">${txt}</button>`;
   el('panel-regeln').innerHTML = `
-    <div class="abschnitt">Auszahlung</div>
-    <div class="schalter"><span class="wer">Blackjack zahlt</span><span class="wahl">
+    <div class="abschnitt">${t('spracheTitel')}</div>
+    <div class="schalter"><span class="wer">${t('spracheLabel')}</span><span class="wahl">
+      ${w('sprache','de','Deutsch',S.sprache!=='en')}${w('sprache','en','English',S.sprache==='en')}
+    </span></div>
+
+    <div class="abschnitt">${t('auszahlungTitel')}</div>
+    <div class="schalter"><span class="wer">${t('bjZahlt')}</span><span class="wahl">
       ${w('bjF','1.5','3:2',S.bjFaktor===1.5)}${w('bjF','1.2','6:5',S.bjFaktor===1.2)}${w('bjF','2','2:1',S.bjFaktor===2)}
     </span></div>
-    <div class="schalter"><span class="wer">Schrittweite Einsatz</span><span class="wahl">
-      ${w('schritt','25','0,25',S.schritt===25)}${w('schritt','50','0,50',S.schritt===50)}${w('schritt','100','1,00',S.schritt===100)}
+    <div class="schalter"><span class="wer">${t('schrittweite')}</span><span class="wahl">
+      ${w('schritt','25',eur(25),S.schritt===25)}${w('schritt','50',eur(50),S.schritt===50)}${w('schritt','100',eur(100),S.schritt===100)}
     </span></div>
-    <div class="schalter"><span class="wer">Standardeinsatz neuer Spieler</span><span class="wahl">
+    <div class="schalter"><span class="wer">${t('standardEinsatz')}</span><span class="wahl">
       <button class="step" data-akt="stdMinus">−</button><span class="zahl" style="min-width:62px;text-align:center">${eur(S.standard)}</span>
       <button class="step" data-akt="stdPlus">+</button>
     </span></div>
 
-    <div class="abschnitt">Zusatzregeln</div>
-    <div class="schalter"><span class="wer">Aufgabe (Surrender)</span>
-      <button class="mod" data-akt="aufgabeAn" aria-pressed="${S.aufgabeAn}">${S.aufgabeAn?'an':'aus'}</button></div>
-    <div class="schalter"><span class="wer">Versicherung</span>
-      <button class="mod" data-akt="versAn" aria-pressed="${S.versAn}">${S.versAn?'an':'aus'}</button></div>
-    <div class="schalter"><span class="wer">Einsätze nach der Runde behalten</span>
-      <button class="mod" data-akt="behalten" aria-pressed="${S.einsaetzeBehalten}">${S.einsaetzeBehalten?'an':'aus'}</button></div>
+    <div class="abschnitt">${t('zusatzregeln')}</div>
+    <div class="schalter"><span class="wer">${t('aufgabeLabel')}</span>
+      <button class="mod" data-akt="aufgabeAn" aria-pressed="${S.aufgabeAn}">${S.aufgabeAn?t('an'):t('aus')}</button></div>
+    <div class="schalter"><span class="wer">${t('versicherungLabel')}</span>
+      <button class="mod" data-akt="versAn" aria-pressed="${S.versAn}">${S.versAn?t('an'):t('aus')}</button></div>
+    <div class="schalter"><span class="wer">${t('behaltenLabel')}</span>
+      <button class="mod" data-akt="behalten" aria-pressed="${S.einsaetzeBehalten}">${S.einsaetzeBehalten?t('an'):t('aus')}</button></div>
 
-    <div class="abschnitt">Wer hält die Bank</div>
-    <div class="schalter"><span class="wer">Bankkonto</span><span class="wahl">
-      ${w('bankModus','haus','Haus',S.bankModus==='haus')}${w('bankModus','spieler','Spieler',S.bankModus==='spieler')}${w('bankModus','aus','keins',S.bankModus==='aus')}
+    <div class="abschnitt">${t('werBank')}</div>
+    <div class="schalter"><span class="wer">${t('bankkonto')}</span><span class="wahl">
+      ${w('bankModus','haus',t('haus'),S.bankModus==='haus')}${w('bankModus','spieler',t('spielerOpt'),S.bankModus==='spieler')}${w('bankModus','aus',t('keins'),S.bankModus==='aus')}
     </span></div>
-    <p class="hinweis">Haus: ein eigenes Bankkonto sammelt alle Gegenbuchungen. Spieler: der Dealer am Tisch
-      bekommt sie gutgeschrieben und kann nach jeder Runde weitergegeben werden. Keins: nur die Spielersalden zählen.</p>
+    <p class="hinweis">${t('bankHinweis')}</p>
 
-    <div class="abschnitt">Speicher</div>
-    <p class="hinweis">Stände werden ${speicherText}.</p>
-
-    <div class="abschnitt">Darstellung</div>
-    <div class="schalter"><span class="wer">Farben</span><span class="wahl">
-      ${w('thema','dunkel','Filzgrün',S.thema!=='hell')}${w('thema','hell','Hell',S.thema==='hell')}
+    <div class="abschnitt">${t('darstellung')}</div>
+    <div class="schalter"><span class="wer">${t('farben')}</span><span class="wahl">
+      ${w('thema','dunkel',t('filzgruen'),S.thema!=='hell')}${w('thema','hell',t('hell'),S.thema==='hell')}
     </span></div>
 
-    <div class="abschnitt">Aufräumen</div>
-    <button class="knopf geist" style="width:100%;margin-bottom:8px" data-akt="saldenNull">Salden auf null, Spieler bleiben</button>
+    <div class="abschnitt">${t('speicherTitel')}</div>
+    <p class="hinweis">${t('speicherSatz', speicherText())}</p>
+
+    <div class="abschnitt">${t('aufraeumen')}</div>
+    <button class="knopf geist" style="width:100%;margin-bottom:8px" data-akt="saldenNull">${t('saldenNull')}</button>
     <button class="knopf warn" style="width:100%" data-akt="reset">
-      ${resetArmiert?'Wirklich alles löschen? Nochmal tippen':'Alles zurücksetzen'}</button>`;
+      ${resetArmiert?t('wirklich'):t('allesLoeschen')}</button>`;
 }
 
 /* ---------- Klicks ---------- */
 document.addEventListener('click', e=>{
   try{ klick(e); }catch(err){ zeigeFehler(err.message); }
 });
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape' && settingsOffen){ settingsOffen=false; resetArmiert=false; render(); }
+});
 function klick(e){
-  const t = e.target.closest('.tab');
-  if(t){ tab = t.dataset.tab; resetArmiert=false; render(); return; }
+  if(e.target.id==='overlay'){ settingsOffen=false; resetArmiert=false; render(); return; }
+  const reiter = e.target.closest('.tab');
+  if(reiter){ tab = reiter.dataset.tab; resetArmiert=false; render(); return; }
   const b = e.target.closest('[data-akt]');
   if(!b) return;
   const a = b.dataset.akt;
@@ -555,6 +715,8 @@ function klick(e){
 
   switch(a){
     case 'name': return;
+    case 'settingsAuf': settingsOffen = true; resetArmiert=false; break;
+    case 'settingsZu': settingsOffen = false; resetArmiert=false; break;
     case 'plus':  h.einsatz += S.schritt; break;
     case 'minus': h.einsatz = Math.max(S.schritt, h.einsatz - S.schritt); break;
     case 'setzeEinsatz': h.einsatz = +b.dataset.w; break;
@@ -584,20 +746,21 @@ function klick(e){
     case 'einkauf': {
       const q = S.spieler.find(x=>x.id===b.dataset.id);
       q.einkauf += +b.dataset.w;
-      protokoll('einkauf', `${q.name}: Einkauf ${eur(+b.dataset.w)}, insgesamt ${eur(q.einkauf)}`);
+      protokoll('einkauf', q.id, +b.dataset.w);
       break;
     }
     case 'korr': {
       const q = S.spieler.find(x=>x.id===b.dataset.id);
       const feld = el('korr-'+q.id);
-      const c = Math.round(parseFloat(String(feld.value).replace(',','.'))*100);
+      const c = Math.round(parseFloat(String(feld.value).replace(/\s/g,'').replace(',','.'))*100);
       if(!c || isNaN(c)) { feld.focus(); return; }
       const d = b.dataset.r==='minus' ? -Math.abs(c) : Math.abs(c);
       q.saldo += d;
-      protokoll('korrektur', `${q.name}: ${eurS(d)} von Hand gebucht`, {[q.id]:d});
+      protokoll('korrektur', q.id, d, {[q.id]:d});
       break;
     }
     case 'export': zeigeExport(); return;
+    case 'sprache': S.sprache = b.dataset.w==='en' ? 'en' : 'de'; break;
     case 'bjF': S.bjFaktor = parseFloat(b.dataset.w); break;
     case 'schritt': S.schritt = +b.dataset.w; S.standard = Math.max(S.schritt, Math.round(S.standard/S.schritt)*S.schritt); break;
     case 'stdPlus': S.standard += S.schritt; break;
@@ -629,16 +792,15 @@ document.addEventListener('input', e=>{
 
 function tausche(i,j){
   if(j<0||j>=S.spieler.length) return;
-  const t = S.spieler[i]; S.spieler[i]=S.spieler[j]; S.spieler[j]=t;
+  const x = S.spieler[i]; S.spieler[i]=S.spieler[j]; S.spieler[j]=x;
 }
 function dealerWeiter(){
   if(!S.spieler.length) return;
   const i = S.spieler.findIndex(istDealer);
   S.dealerId = S.spieler[(i+1) % S.spieler.length].id;
 }
-function protokoll(typ, text, deltas){
-  S.verlauf.push({typ, text, deltas:deltas||{}, ergebnisse:{}, bank:0,
-    zeit:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});
+function protokoll(typ, id, betrag, deltas){
+  S.verlauf.push({typ, id, betrag, deltas:deltas||{}, ergebnisse:{}, bank:0, zeit:uhr()});
 }
 
 el('addBtn').addEventListener('click', aufnehmen);
@@ -668,8 +830,7 @@ el('abschluss').addEventListener('click', ()=>{
     if(d){ d.saldo -= summe; bankDelta = -summe; deltas[d.id] = (deltas[d.id]||0) - summe; }
   }
   S.verlauf.push({typ:'runde', runde:S.runde, deltas, ergebnisse,
-    bank:S.bankModus==='haus'?bankDelta:0,
-    zeit:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});
+    bank:S.bankModus==='haus'?bankDelta:0, zeit:uhr()});
   S.runde++;
   S.dealerBJ=false;
   S.spieler.forEach(p=>{
@@ -696,23 +857,21 @@ function undo(){
     }
   }
   if(r.typ==='einkauf'){
-    const m = /^(.*?): Einkauf/.exec(r.text||'');
-    const p = m && S.spieler.find(x=>x.name===m[1]);
-    const c = /Einkauf ([\d.,]+)/.exec(r.text||'');
-    if(p && c) p.einkauf = Math.max(0, p.einkauf - Math.round(parseFloat(c[1].replace('.','').replace(',','.'))*100));
+    const p = S.spieler.find(x=>x.id===r.id);
+    if(p && r.betrag) p.einkauf = Math.max(0, p.einkauf - r.betrag);
   }
 }
 
 function zeigeExport(){
   const runden = S.verlauf.filter(r=>r.typ==='runde').length;
   const zeilen = [
-    `Blackjack-Abrechnung, ${new Date().toLocaleDateString('de-DE')}`,
-    `${runden} Runden, ${bjText()}`, '',
+    t('exportKopf', new Date().toLocaleDateString(loc())),
+    t('exportRunden', runden, bjText()), '',
     ...[...S.spieler].sort((a,b)=>b.saldo-a.saldo).map(p=>
-      `${p.name}: ${eurS(p.saldo)}  (Einkauf ${eur(p.einkauf)}, Auszahlung ${eur(p.einkauf+p.saldo)})`),
-    ...(S.bankModus==='haus'?[`Bank: ${eurS(S.bank)}`]:[]), '',
-    'Ausgleich:',
-    ...(ausgleich().map(t=>`${t.von} zahlt ${eur(t.betrag)} an ${t.an}`)),
+      t('exportSpieler', p.name, eurS(p.saldo), eur(p.einkauf), eur(p.einkauf+p.saldo))),
+    ...(S.bankModus==='haus'?[t('exportBank', eurS(S.bank))]:[]), '',
+    t('exportAusgleich'),
+    ...(ausgleich().map(x=>t('exportZahlt', x.von, eur(x.betrag), x.an))),
   ];
   el('exportBox').innerHTML = `<textarea class="feld" readonly style="margin-top:8px">${esc(zeilen.join('\n'))}</textarea>`;
   const ta = el('exportBox').querySelector('textarea');
@@ -724,9 +883,9 @@ function zeigeFehler(txt){
   const f = document.getElementById('fehlerband');
   if(!f) return;
   f.hidden = false;
-  f.textContent = 'Fehler: ' + txt;
+  f.textContent = t('fehler') + txt;
 }
-window.addEventListener('error', ev=>zeigeFehler(ev.message||'unbekannt'));
+window.addEventListener('error', ev=>zeigeFehler(ev.message||t('unbekannt')));
 window.addEventListener('unhandledrejection', ev=>zeigeFehler(String(ev.reason)));
 
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
@@ -734,7 +893,7 @@ if('serviceWorker' in navigator && location.protocol.startsWith('http')){
 }
 
 (async ()=>{
-  try{ await laden(); }catch(e){ zeigeFehler('Laden: '+e.message); }
-  try{ render(); }catch(e){ zeigeFehler('Anzeige: '+e.message); }
+  try{ await laden(); }catch(e){ zeigeFehler(t('ladenFehler')+e.message); }
+  try{ render(); }catch(e){ zeigeFehler(t('anzeigeFehler')+e.message); }
 })();
 </script>
