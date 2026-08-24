@@ -12,7 +12,7 @@ lässt sich als App auf den Home-Bildschirm legen und funktioniert danach auch o
 
 - Einsatz pro Spieler in frei wählbaren Schritten, dazu Schnellwerte von 0,50 € bis 10 €
 - Ergebnisse: Gewinn, Push, Verlust, Blackjack, Aufgabe
-- Double down, Split bis zu vier Händen, alle mit demselben Einsatz, Versicherung
+- Double down, Split bis zu vier Händen (alle Hände laufen mit demselben Einsatz), Versicherung
 - Ein Klick für den ganzen Tisch: Dealer überkauft, Dealer gewinnt, alles Push
 - Live-Vorschau, was die Runde für jeden bedeutet, bevor sie gebucht wird
 
@@ -20,7 +20,7 @@ lässt sich als App auf den Home-Bildschirm legen und funktioniert danach auch o
 
 - Spieler aufnehmen, umbenennen, pausieren, entfernen
 - Reihenfolge mit Pfeilen ändern, passend zur Sitzordnung
-- Bank wahlweise als Haus, als rotierender Spieler-Dealer oder gar nicht
+- Bank wahlweise als Haus, als Spieler-Dealer (Wechsel nur per Knopf) oder gar nicht
 
 **Kasse**
 
@@ -34,13 +34,6 @@ lässt sich als App auf den Home-Bildschirm legen und funktioniert danach auch o
 - Jede Runde, jeder Einkauf, jede Korrektur mit Uhrzeit
 - Letzter Eintrag lässt sich vollständig zurücknehmen, inklusive Dealerwechsel
 
-**Regelwerk** (Buch oben rechts)
-
-- Nachschlagewerk zu Kartenwerten, Ablauf, Split, Double down, Versicherung, Aufgabe und Push
-- Was die Bank tun muss und was ihr vor der ersten Runde klären solltet
-- Die Buchungstabelle zeigt die Quote, die gerade eingestellt ist
-- Abgeschaltete Zusatzregeln sind als solche gekennzeichnet
-
 **Einstellungen** (Zahnrad oben rechts)
 
 - Sprache der Oberfläche: Deutsch oder Englisch, inklusive Zahlen- und Datumsformat
@@ -49,6 +42,13 @@ lässt sich als App auf den Home-Bildschirm legen und funktioniert danach auch o
 - Aufgabe und Versicherung abschaltbar
 - Einsätze nach der Runde behalten oder zurücksetzen
 - Farben: Filzgrün oder heller Modus
+
+**Regelwerk** (Buch oben rechts)
+
+- Nachschlagewerk zu Kartenwerten, Ablauf, Split, Double down, Versicherung, Aufgabe und Push
+- Was die Bank tun muss und was ihr vor der ersten Runde klären solltet
+- Die Buchungstabelle zeigt die Quote, die gerade eingestellt ist
+- Abgeschaltete Zusatzregeln sind als solche gekennzeichnet
 
 ## Rechenregeln
 
@@ -63,6 +63,10 @@ Alle Beträge werden intern in Cent gerechnet, es gibt also keine Rundungsfehler
 | Verlust | `−E`, mit Double `−2E` |
 | Aufgabe | `−E / 2` |
 | Versicherung | Einsatz `E / 2`, zahlt 2:1, also `+E` bei Dealer-Blackjack, sonst `−E / 2` |
+
+Ist **Dealer hat Blackjack** gesetzt, ist die Runde sofort entschieden: Hände mit eigenem
+Blackjack werden zum Push, alle übrigen verlieren den einfachen Einsatz. Double und Split
+sind dann nicht möglich, die Versicherung wird mit `+E` gutgeschrieben.
 
 Die Bank bekommt die Gegenbuchung der Summe aller Spieler, damit die Kasse am Ende aufgeht.
 
@@ -107,7 +111,7 @@ Tabs. Unter *Regeln → Speicher* steht, was gerade gilt.
 
 ## Aktualisieren
 
-Nach jeder Änderung an `index.html` in `sw.js` die Zeile `const VERSION = 'kladde-v2';`
+Nach jeder Änderung an `index.html` in `sw.js` die Zeile `const VERSION = 'kladde-v8';`
 hochzählen. Sonst behalten bereits installierte Geräte die alte Fassung aus dem Cache.
 
 ## Anpassen
