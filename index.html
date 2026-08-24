@@ -252,6 +252,7 @@ const TEXTE = {
     leeren:'Leeren', dealerHatBJ:'Dealer hat Blackjack',
     auchBJ:'Auch Blackjack', bjVerliert:'Dealer-Blackjack: Hand verliert {0}', gleicherEinsatz:'wie Hand 1',
     bjPush:'Beide Blackjack: Push, Einsatz zurück',
+    bjVersAus:'Dealer-Blackjack: Versicherung gleicht den Verlust aus, unterm Strich {0}',
     leerHinweis:'Noch niemand am Tisch. Namen eintragen, Einsätze stellen, nach jeder Runde abhaken. Die Reihenfolge kannst du später mit den Pfeilen auf jeder Karte ändern.',
     dealerHinweis:'Gibt diese Runde die Karten und bekommt die Gegenbuchung aller Gewinne und Verluste.',
     pauseHinweis:'Setzt diese Runde aus.',
@@ -308,6 +309,7 @@ const TEXTE = {
     leeren:'Clear', dealerHatBJ:'Dealer has blackjack',
     auchBJ:'Also blackjack', bjVerliert:'Dealer blackjack: hand loses {0}', gleicherEinsatz:'same as hand 1',
     bjPush:'Both blackjack: push, bet returned',
+    bjVersAus:'Dealer blackjack: insurance offsets the loss, {0} on balance',
     leerHinweis:'Nobody at the table yet. Add names, set the bets, tick off the results after each round. You can reorder players later with the arrows on each card.',
     dealerHinweis:'Deals this round and receives the counter entry for every win and loss.',
     pauseHinweis:'Sitting out this round.',
@@ -730,6 +732,9 @@ function versZeile(p,pi,h){
    ob der Spieler ebenfalls Blackjack hat. */
 function bjHand(p,pi,h,hi){
   const push = h.ergebnis==='bj';
+  /* Die Versicherung haengt an Hand 1 und zahlt genau den einfachen Einsatz,
+     gleicht dort also den Verlust der Hand aus. Weitere Haende verlieren normal. */
+  const versAusgleich = hi===0 && S.versAn && !!h.vers;
   return `
     <div class="hand">
       ${einsatzZeile(p,pi,h,hi,false)}
@@ -743,7 +748,10 @@ function bjHand(p,pi,h,hi){
           : `<button class="erg" data-akt="unsplit" data-p="${pi}" data-h="${hi}">${t('handWeg')}</button>`}
       </div>
       ${hi===0?versZeile(p,pi,h):''}
-      <p class="hinweis" style="margin:6px 0 0">${push?t('bjPush'):t('bjVerliert', eurS(-h.einsatz))}</p>
+      <p class="hinweis" style="margin:6px 0 0">${
+        push ? t('bjPush')
+        : versAusgleich ? t('bjVersAus', eur(0))
+        : t('bjVerliert', eurS(-h.einsatz))}</p>
     </div>`;
 }
 

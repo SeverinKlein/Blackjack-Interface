@@ -111,7 +111,7 @@ Tabs. Unter *Regeln → Speicher* steht, was gerade gilt.
 
 ## Aktualisieren
 
-Nach jeder Änderung an `index.html` in `sw.js` die Zeile `const VERSION = 'kladde-v8';`
+Nach jeder Änderung an `index.html` in `sw.js` die Zeile `const VERSION = 'kladde-v9';`
 hochzählen. Sonst behalten bereits installierte Geräte die alte Fassung aus dem Cache.
 
 ## Anpassen
